@@ -1,12 +1,18 @@
 {
-  "extends" : [
+  "extends": [
     "tslint:recommended"
   ],
   "rules": {
     "forin": false,
-    "interface-name": [false],
-    "no-console": [false],
-    "no-namespace": [true, "allow-declarations"],
+    "interface-name": [
+      false
+    ],
+    "no-console": [
+      false
+    ],
+    "no-namespace": {
+      "severity": "warning"
+    },
     "trailing-comma": [
       true,
       "never"
@@ -17,6 +23,36 @@
       "check-format",
       "allow-pascal-case",
       "allow-leading-underscore"
-    ]
+    ],
+    "one-line": [
+      false,
+      "check-catch",
+      "check-finally",
+      "check-else",
+      "check-open-brace"
+    ],
+    "ordered-imports": false,
+    "no-trailing-whitespace": [
+      true,
+      "ignore-blank-lines"
+    ],
+    "object-literal-sort-keys": false,
+    "align": [
+      false,
+      "parameters"
+    ],
+    "max-line-length": {
+      "severity": "warning",
+      "options": 90
+    },
+    "arrow-return-shorthand": {
+      "severity": "warning"
+    },
+    "only-arrow-functions": {
+      "severity": "warning"
+    },
+    "no-shadowed-variable": {
+      "severity": "warning"
+    }
   }
 }

@@ -19,7 +19,7 @@ declare global
     dropOff: IdentifiableStructure;
     pickUp: IdentifiableStructure;
     rate: number;
-    resourceType: string;
+    resourceType: ResourceConstant;
     pPath?: string;
     dPath?: string;
   }
@@ -37,7 +37,7 @@ export class JobHaul extends Job
   // =============================================================================
 
   public static create(pickUpStructure: Structure, dropOffStructure: Structure,
-    resourceType: string = RESOURCE_ENERGY, rate: number = Infinity)
+    resourceType: ResourceConstant = RESOURCE_ENERGY, rate: number = Infinity)
   {
     // make sure the resource is a defined resource type, defaults to energy
     if (RESOURCES_ALL.indexOf(resourceType) < 0)
@@ -112,7 +112,7 @@ export class JobHaul extends Job
   // =============================================================================
 
   public reassign(pickUpStructure: Structure, dropOffStructure: Structure,
-    resource: string, rate: number): void
+    resource: ResourceConstant, rate: number): void
   {
     const newJob = JobHaul.create(pickUpStructure, dropOffStructure, resource, rate);
 
@@ -192,7 +192,7 @@ export class JobHaul extends Job
 
   // PATH METHODS
 
-  public generatePaths(): number
+  public generatePaths(): ScreepsReturnCode
   {
     const dropOffPosition = RoomPositionExt.deserialize(this.getDropOffData().pos);
     const pickUpPosition = RoomPositionExt.deserialize(this.getPickUpData().pos);
@@ -276,6 +276,14 @@ export class JobHaul extends Job
         // get difference in x and y between positions
         const dx = pos.x - previousPos.x;
         const dy = pos.y - previousPos.y;
+        const dir = this.getDirectionFromOffset(dx, dy);
+        const opDir = this.getDirectionFromOffset(dx, dy);
+
+        // to convince the ts checker that they aren't 0.
+        if (dir === 0 || opDir === 0)
+        {
+          return ERR_NO_PATH;
+        }
 
         // current position, going from last position
         const pStep: PathStep = {
@@ -283,7 +291,7 @@ export class JobHaul extends Job
           y: pos.y,
           dx,
           dy,
-          direction: this.getDirectionFromOffset(dx, dy)
+          direction: dir
         };
 
         // last position, going from current position
@@ -292,7 +300,7 @@ export class JobHaul extends Job
           y: previousPos.y,
           dx: -dx,
           dy: -dy,
-          direction: this.getDirectionFromOffset(-dx, -dy)
+          direction: opDir
         };
 
         // add steps to each array
@@ -340,9 +348,9 @@ export class JobHaul extends Job
     return Memory.Job.Haul[this._id];
   }
 
-  private getDirectionFromOffset(dx: number, dy: number): number
+  private getDirectionFromOffset(dx: number, dy: number): DirectionConstant | 0
   {
-    const directions = [
+    const directions: (DirectionConstant | 0)[][] = [
       [TOP_LEFT, TOP, TOP_RIGHT],
       [LEFT, 0, RIGHT],
       [BOTTOM_LEFT, BOTTOM, BOTTOM_RIGHT]];

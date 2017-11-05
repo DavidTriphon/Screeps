@@ -41,7 +41,7 @@ declare global
 
   interface IdentifiableResource extends Identifiable
   {
-    resourceType: string;
+    resourceType: ResourceConstant;
     isRenewable: boolean;
   }
 }

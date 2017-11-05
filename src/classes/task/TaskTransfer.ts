@@ -17,7 +17,7 @@ declare global
   interface TransferTaskMemory extends TaskMemory
   {
     dropOff: IdentifiableStructure;
-    resourceType: string;
+    resourceType: ResourceConstant;
   }
 }
 
@@ -32,7 +32,9 @@ export class Transfer extends Task<TransferTaskMemory>
   //   STATIC METHODS
   // =============================================================================
 
-  public static createMemory(structure: IdentifiableStructure, resourceType: string):
+  public static createMemory(
+    structure: IdentifiableStructure,
+    resourceType: ResourceConstant):
     TransferTaskMemory
   {
     if (!structure.isConstructed)
@@ -76,6 +78,7 @@ export class Transfer extends Task<TransferTaskMemory>
       // transferred successfully
       if (result === OK || result === ERR_NOT_ENOUGH_ENERGY)
       {
+        creep.carry.energy = 0;
         return TaskResult.DONE;
       }
 

@@ -10,6 +10,11 @@ import {TaskResult} from "../classes/task/TaskResult";
 
 declare global
 {
+  interface CreepMemory
+  {
+    task: TaskMemory | undefined;
+  }
+
   interface Creep
   {
     // task
@@ -87,9 +92,9 @@ export class CreepExt extends Creep
   //   CARRY ABSTRACTION METHODS
   // =============================================================================
 
-  public amountOf(resource: string): number
+  public amountOf(resourceType: ResourceConstant): number
   {
-    const amount = this.carry[resource];
+    const amount = this.carry[resourceType];
     return (amount === undefined ? 0 : amount);
   }
 
@@ -128,7 +133,7 @@ export class CreepExt extends Creep
     return (this._isFull);
   }
 
-  public isFullOf(resource: string): boolean
+  public isFullOf(resourceType: ResourceConstant): boolean
   {
     // make sure the isFullOf is already labelled.
     if (this._isFullOf === undefined)
@@ -137,13 +142,13 @@ export class CreepExt extends Creep
     }
 
     // if the 1 tick variable isn't set, set it
-    if (this._isFullOf[resource] === undefined)
+    if (this._isFullOf[resourceType] === undefined)
     {
-      this._isFullOf[resource] = (this.carry[resource] === this.carryCapacity);
+      this._isFullOf[resourceType] = (this.carry[resourceType] === this.carryCapacity);
     }
 
     // return the result
-    return (this._isFullOf[resource]);
+    return (this._isFullOf[resourceType]);
   }
 
   public isEmpty(): boolean
@@ -158,7 +163,7 @@ export class CreepExt extends Creep
     return (this._filledSpace === 0);
   }
 
-  public isEmptyOf(resource: string): boolean
+  public isEmptyOf(resourceType: ResourceConstant): boolean
   {
     // make sure the isFullOf is already labelled.
     if (this._isEmptyOf === undefined)
@@ -166,12 +171,12 @@ export class CreepExt extends Creep
       this._isEmptyOf = {};
     }
     // if the 1 tick variable isn't set, set it
-    if (this._isEmptyOf[resource] === undefined)
+    if (this._isEmptyOf[resourceType] === undefined)
     {
-      this._isEmptyOf[resource] = (this.carry[resource] === 0);
+      this._isEmptyOf[resourceType] = (this.carry[resourceType] === 0);
     }
     // return the result
-    return (this._isEmptyOf[resource]);
+    return (this._isEmptyOf[resourceType]);
   }
 
   // =============================================================================

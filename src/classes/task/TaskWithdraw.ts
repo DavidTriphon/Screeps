@@ -17,7 +17,7 @@ declare global
   interface WithdrawTaskMemory extends TaskMemory
   {
     pickUp: IdentifiableStructure;
-    resourceType: string;
+    resourceType: ResourceConstant;
   }
 }
 
@@ -32,7 +32,9 @@ export class Withdraw extends Task<WithdrawTaskMemory>
   //   STATIC METHODS
   // =============================================================================
 
-  public static createMemory(structure: IdentifiableStructure, resourceType: string):
+  public static createMemory(
+    structure: IdentifiableStructure,
+    resourceType: ResourceConstant):
     WithdrawTaskMemory
   {
     if (!structure.isConstructed)

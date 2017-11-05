@@ -10,14 +10,18 @@
     "noUnusedParameters": true,
     "noUnusedLocals": true,
     "sourceMap": true,
-    "baseUrl": "./src/"
+    "baseUrl": "./src/",
+    "types": [
+      "lodash",
+      "typed-screeps",
+      "screeps-profiler"
+    ]
   },
   "compileOnSave": false,
   "include": [
     "webpack.config.ts",
     "config/*.ts",
     "libs/*.ts",
-    "typings/**/*.d.ts",
     "src/**/*.ts",
     "src/**/*.d.ts"
   ],

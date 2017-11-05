@@ -111,9 +111,6 @@ export abstract class Job
         "\" is already hired for " + this.toString + ".");
     }
 
-    // erase whatever old task it had.
-    creep.memory.task = undefined;
-
     // push the name onto the list
     Memory.Job[this._jobType][this._id].creeps.push(creep.name);
 
@@ -130,6 +127,9 @@ export abstract class Job
     {
       throw new Error("Cannot fire undefined for " + this.toString + ".");
     }
+
+    // erase whatever old task it had.
+    creep.memory.task = undefined;
 
     this.fireByName(creep.name);
   }

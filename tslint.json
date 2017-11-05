@@ -64,6 +64,7 @@
     },
     "no-empty": {
       "severity": "warning"
-    }
+    },
+    "array-type": false
   }
 }

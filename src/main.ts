@@ -29,19 +29,19 @@ Bootstrapper.extendPrototypes();
 
 declare global
 {
-  // we need this because we deleted @node/types
-  function require(module: string): any;
-
-  // this allows us to write and read anything from global.
-  const global: {
-    [k: string]: any;
-    IS_FRIENDLY: {[name: string]: boolean};
-    MY_USERNAME: string;
-    System: any;
-    ex: (x: any) => string;
-    JobCtor: {[type: string]: JobDefiner.JobConstructor};
-    TaskList: {[type: string]: TaskDefiner.TaskConstructor<any, any>};
-  };
+  namespace NodeJS
+  {
+    interface Global
+    {
+      [k: string]: any;
+      IS_FRIENDLY: {[name: string]: boolean};
+      MY_USERNAME: string;
+      System: any;
+      ex: (x: any) => string;
+      JobList: {[type: string]: JobDefiner.JobConstructor};
+      TaskList: {[type: string]: TaskDefiner.TaskConstructor<any, any>};
+    }
+  }
 }
 
 global.MY_USERNAME = "DavidTriphon";
@@ -57,7 +57,7 @@ global.IS_FRIENDLY = {
 
 global.ex = (x: any) => JSON.stringify(x, null, 2); // courtesy of @warinternal Aug 2016
 
-global.JobCtor = JobDefiner.definitions;
+global.JobList = JobDefiner.definitions;
 
 global.TaskList = TaskDefiner.taskList;
 
@@ -194,7 +194,7 @@ export const loop = function main(): void
   {
     for (const id of Memory[jobType])
     {
-      const job = new global.JobCtor[jobType](id);
+      const job = new global.JobList[jobType](id);
       job.execute();
     }
   }

@@ -68,7 +68,7 @@ export class CreepExt extends Creep
 
   public doTask(): TaskResult
   {
-    return global.TaskList[this.getTaskType()].execute(this, this.getTask());
+    return new global.TaskList[this.getTaskType()](this.getTask()).execute(this);
   }
 
   // =============================================================================

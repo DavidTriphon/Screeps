@@ -137,7 +137,8 @@ export class RoomPositionExt extends RoomPosition
 
   public distanceTo(pos: RoomPosition)
   {
-    // use this line if you want to allow this method to accept RoomObject instances as well
+    // use this line if you want to allow this
+    // method to accept RoomObject instances as well
     // target = (target instanceof RoomObject ? target.pos : target);
 
     // get the objects for the absolute coordinates
@@ -170,7 +171,8 @@ export class RoomPositionExt extends RoomPosition
     // find euclidean distance
     const dist = Math.max(xDist, yDist);
 
-    // console.log('please confirm: max of (' + xDist + ') and (' + yDist + ') is ' + dist + '. ?');
+    // console.log("please confirm: max of ("" +
+    // xDist + ") and (" + yDist + ") is " + dist + ". ?");
 
     return dist;
   }
@@ -181,10 +183,10 @@ export class RoomPositionExt extends RoomPosition
     const roomCoords = getRoomCoord(this.roomName);
 
     // find absolute position coordinates
-    const xAbs = this.x + 50 * roomCoords.x;
-    const yAbs = this.y + 50 * roomCoords.y;
+    const x = this.x + 50 * roomCoords.x;
+    const y = this.y + 50 * roomCoords.y;
 
     // return coordinate object
-    return {x: xAbs, y: yAbs};
+    return {x, y};
   }
 }

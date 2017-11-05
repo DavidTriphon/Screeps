@@ -2,16 +2,31 @@
 //   IMPORTS
 // =============================================================================
 
-import {JobHire} from "./JobHire";
+import {Job} from "./Job";
 import {RoomPositionExt} from "../../prototypes/RoomPosition";
 import * as Task from "../task/Module";
 import {TaskResult} from "../task/TaskResult";
+import {JobDefinition} from "./JobDefinition";
+
+// =============================================================================
+//   INTERFACES
+// =============================================================================
+
+declare global
+{
+  interface JobDefendMemory extends JobMemory
+  {
+    pos: string;
+    range: number;
+  }
+}
 
 // =============================================================================
 //   CLASS DEFINITION
 // =============================================================================
 
-export class JobDefend extends JobHire
+@JobDefinition("Defend")
+export class JobDefend extends Job
 {
   // =============================================================================
   //   MEMORY METHODS
@@ -123,7 +138,7 @@ export class JobDefend extends JobHire
 
         const result = creep.doTask();
 
-        if (result !== TaskResult.NOT_DONE)
+        if (result !== TaskResult.WORKING)
         {
           if (hostiles.length > 0)
           {

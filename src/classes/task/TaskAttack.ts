@@ -2,40 +2,115 @@
 //   IMPORTS
 // =============================================================================
 
-import {Task} from "./AbstractTask";
+import {Task} from "./Task";
 import {TaskResult} from "./TaskResult";
+import * as Visibility from "../../Visibility";
 import {RoomPositionExt} from "../../prototypes/RoomPosition";
+import {TaskDefinition} from "./TaskDefinition";
+
+// =============================================================================
+//   INTERFACES
+// =============================================================================
+
+declare global
+{
+  interface AttackTaskMemory extends TaskMemory
+  {
+    target: IdentifiableCreep | IdentifiableStructure;
+    isCreep: boolean;
+  }
+}
 
 // =============================================================================
 //   DEFINITION
 // =============================================================================
 
-export const TaskAttack: Task<AttackTaskData> = {
-  execute(creep: Creep, data: AttackTaskData): TaskResult
+@TaskDefinition("Attack")
+export class Attack extends Task<AttackTaskMemory>
+{
+  // =============================================================================
+  //   STATIC METHODS
+  // =============================================================================
+
+  public static createMemory(
+    target: IdentifiableStructure | IdentifiableCreep,
+    isCreep: boolean): AttackTaskMemory
   {
-    const target: Creep | Structure | null =
-      Game.getObjectById<Creep | Structure>(data.target.id);
-
-    if (target !== null)
+    if (isCreep && (target as IdentifiableCreep).user === undefined)
     {
-      // try to attack the target
-      creep.attack(target);
+      throw new Error("target must be a creep if the isCreep flag is set.");
+    }
 
-      // make sure you chase it if it runs.
+    return {target, isCreep, type: "Attack"};
+  }
+
+  // =============================================================================
+  //   CONSTRUCTOR
+  // =============================================================================
+
+  constructor(memory: AttackTaskMemory)
+  {
+    super(memory);
+  }
+
+  // =============================================================================
+  //   PUBLIC METHODS
+  // =============================================================================
+
+  public execute(creep: Creep): TaskResult
+  {
+    let target = (this.memory.isCreep ?
+      Visibility.identifyCreep(this.memory.target as IdentifiableCreep) :
+      Visibility.identifyVagueStructure(this.memory.target as IdentifiableStructure));
+
+    // if there's an array, just grab the first element
+    if (target instanceof Array)
+    {
+      target = target[0];
+    }
+
+    // attack the target
+    if (target instanceof Creep ||
+      target instanceof Structure)
+    {
+      // always move towards the target
+      creep.moveTo(target);
+      // attack the target
+      const result = creep.attack(target);
+
+      // really bad error
+      if (result !== OK && result !== ERR_NOT_IN_RANGE)
+      {
+        throw new Error("Unexpected result from attacking " + target +
+          " with " + creep + ": " + result);
+      }
+
+      return TaskResult.WORKING;
+    }
+
+    // attack a construction site by moving over it.
+    else if (target instanceof ConstructionSite)
+    {
       creep.moveTo(target);
 
-      return TaskResult.NOT_DONE;
+      return TaskResult.WORKING;
     }
 
-    const pos = RoomPositionExt.deserialize(data.target.pos);
-
-    if (Game.rooms[pos.roomName] === undefined)
-    {
-      return TaskResult.DONE;
-    }
+    // Apparently the location errored
     else
     {
-      return TaskResult.NOT_DONE;
+      switch (target)
+      {
+        case Visibility.ERROR.NOT_VISIBLE:
+          {
+            creep.moveTo(RoomPositionExt.deserialize(this.memory.target.pos));
+            return TaskResult.WORKING;
+          }
+        default:
+          {
+            throw new Error("The site data is REALLY BAD. ie. it's not a site.");
+          }
+      }
     }
   }
-};
+}

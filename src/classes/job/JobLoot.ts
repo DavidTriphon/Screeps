@@ -7,10 +7,12 @@
  * mod.thing == 'a thing'; // true
  */
 
-import {JobHire} from "./Job.Hire";
+import {Job} from "./Job";
 import {RoomPositionExt} from "../../prototypes/RoomPosition";
+import {JobDefinition} from "./JobDefinition";
 
-export class JobLoot extends JobHire
+@JobDefinition("Loot")
+export class JobLoot extends Job
 {
   // =============================================================================
   //  MEMORY METHODS

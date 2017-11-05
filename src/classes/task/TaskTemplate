@@ -1,0 +1,82 @@
+// =============================================================================
+//   IMPORTS
+// =============================================================================
+
+import {Task} from "./Task";
+import {TaskResult} from "./TaskResult";
+import * as Visibility from "../../Visibility";
+import {RoomPositionExt} from "../../prototypes/RoomPosition";
+
+// =============================================================================
+//   INTERFACES
+// =============================================================================
+
+declare global
+{
+  interface MyTaskMemory extends TaskMemory
+  {
+
+  }
+}
+
+// =============================================================================
+//   DEFINITION
+// =============================================================================
+
+export const MyTask: Task<MyTaskMemory> = {
+  execute(creep: Creep, data: MyTaskMemory): TaskResult
+  {
+    const thing = Visibility.identifyThing(data.thing);
+
+    // get the idea out of its head that there could be multiple things
+    if (thing instanceof Array)
+    {
+      throw new Error("IMPOSSIBILITY: CHECK IMPLEMENTTAION:\n" +
+        "Visibility claims there is an array of structures at a single position.");
+    }
+
+    // let's check if it actually found the thing
+    if (thing instanceof Thing)
+    {
+      // try to do thing to the thing
+      const result = creep.doThing(thing);
+
+      // did thing well
+      if (result === OK)
+      {
+        return TaskResult.DONE;
+      }
+
+      // thing out of range
+      else if (result === ERR_NOT_IN_RANGE)
+      {
+        creep.moveTo(thing);
+        return TaskResult.WORKING;
+      }
+
+      // really bad error
+      else
+      {
+        throw new Error("Unexpected result from doing thing to " + thing +
+          " with " + creep + ": " + result);
+      }
+    }
+
+    // Apparently the location errored
+    else
+    {
+      switch (thing)
+      {
+        case Visibility.ERROR.NOT_VISIBLE:
+          {
+            creep.moveTo(RoomPositionExt.deserialize(data.thing.pos));
+            return TaskResult.WORKING;
+          }
+        default:
+          {
+            throw new Error("The thing data is REALLY BAD. ie. it's not a thing.");
+          }
+      }
+    }
+  }
+};

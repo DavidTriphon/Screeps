@@ -7,12 +7,14 @@
  * mod.thing == 'a thing'; // true
  */
 
-import {JobHire} from "./JobHire";
+import {Job} from "./Job";
 import {RoomPositionExt} from "../../prototypes/RoomPosition";
 import * as Task from "../task/Module";
 import {TaskResult} from "../task/TaskResult";
+import {JobDefinition} from "./JobDefinition";
 
-export class JobFillSpawn extends JobHire
+@JobDefinition("FillSpawn")
+export class JobFillSpawn extends Job
 {
   // =============================================================================
   //  MEMORY METHODS
@@ -93,7 +95,7 @@ export class JobFillSpawn extends JobHire
 
         const result = creep.doTask();
 
-        if (result !== TaskResult.NOT_DONE)
+        if (result !== TaskResult.WORKING)
         {
           // get the work task or refill task based on whether it's empty
 

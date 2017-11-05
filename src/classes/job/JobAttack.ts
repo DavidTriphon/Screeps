@@ -1,13 +1,31 @@
-// IMPORTS
+// =============================================================================
+//   IMPORTS
+// =============================================================================
 
 import {RoomPositionExt} from "../../prototypes/RoomPosition";
-import {JobHire} from "./JobHire";
+import {Job} from "./Job";
 import * as Task from "../task/Module";
 import {TaskResult} from "../task/TaskResult";
+import {JobDefinition} from "./JobDefinition";
 
-// CLASS
+// =============================================================================
+//   INTERFACES
+// =============================================================================
 
-export class JobAttack extends JobHire
+declare global
+{
+  interface JobAttackMemory extends JobMemory
+  {
+    target: IdentifiableCreep | IdentifiableStructure;
+  }
+}
+
+// =============================================================================
+//   CLASS DEFINITION
+// =============================================================================
+
+@JobDefinition("Attack")
+export class JobAttack extends Job
 {
   // =============================================================================
   //  MEMORY METHODS
@@ -104,7 +122,7 @@ export class JobAttack extends JobHire
 
         const result = creep.doTask();
 
-        if (result !== TaskResult.NOT_DONE)
+        if (result !== TaskResult.WORKING)
         {
           // set the task and do it once this tick
           creep.setTask(currentTask);

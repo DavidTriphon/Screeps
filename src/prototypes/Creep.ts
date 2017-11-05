@@ -3,7 +3,6 @@
 // =============================================================================
 
 import {TaskResult} from "../classes/task/TaskResult";
-import * as Task from "../classes/task/Module";
 
 // =============================================================================
 //   PROTOTYPE INTERFACE
@@ -15,10 +14,11 @@ declare global
   {
     // task
     doTask(): TaskResult;
-    setTask(taskData: TaskData): void;
+    setTask(taskData: TaskMemory): void;
     // movement
     moveToRoom(room: Room | string): number;
     // inventory
+    amountOf(resource: string): number;
     filledSpace(): number;
     emptySpace(): number;
     isFull(): boolean;
@@ -51,26 +51,24 @@ export class CreepExt extends Creep
   //   TASK METHODS
   // =============================================================================
 
-  public setTask(taskData: TaskData): void
+  public setTask(taskData: TaskMemory): void
   {
     this.memory.task = taskData;
-    this.memory.taskType = ;
   }
 
   public getTaskType(): string
   {
-    return this.memory.taskType;
+    return this.getTask().type;
   }
 
-  public getTask(): TaskData
+  public getTask(): TaskMemory
   {
-    return this.memory.task as TaskData;
+    return this.memory.task as TaskMemory;
   }
 
   public doTask(): TaskResult
   {
-    const task = Task[this.getTaskType()];
-    return task.execute(this, this.getTask());
+    return global.TaskList[this.getTaskType()].execute(this, this.getTask());
   }
 
   // =============================================================================
@@ -87,6 +85,12 @@ export class CreepExt extends Creep
   // =============================================================================
   //   CARRY ABSTRACTION METHODS
   // =============================================================================
+
+  public amountOf(resource: string): number
+  {
+    const amount = this.carry[resource];
+    return (amount === undefined ? 0 : amount);
+  }
 
   public filledSpace(): number
   {

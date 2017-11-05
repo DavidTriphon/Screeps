@@ -2,26 +2,38 @@
 //   IMPORTS
 // =============================================================================
 
-import {JobHire} from "./JobHire";
-import * as Visibility from "../../Visibility";
+import {Job} from "./Job";
+import * as Task from "../task/Module";
 import {TaskResult} from "../task/TaskResult";
+import {JobDefinition} from "./JobDefinition";
 
-const type = "Build";
+// =============================================================================
+//   CONSTANTS
+// =============================================================================
+
+// =============================================================================
+//   INTERFACES
+// =============================================================================
+
+declare global
+{
+  interface JobBuildData extends JobMemory
+  {
+    pickUp: IdentifiableStructure;
+    site: IdentifiableStructure | null;
+  }
+}
 
 // =============================================================================
 //   CLASS DEFINITION
 // =============================================================================
 
-export class JobBuild extends JobHire
+@JobDefinition("Build")
+export class JobBuild extends Job
 {
   // =============================================================================
   //   MEMORY METHODS
   // =============================================================================
-
-  // variables saved to memory include:
-  // - pickUp: IdentifiableStructure
-  // - site: IdentifiableConstructionSite | boolean
-  // - creepNames : []
 
   public static create(site: ConstructionSite, pickUp: Structure): JobBuild
   {
@@ -48,13 +60,8 @@ export class JobBuild extends JobHire
     // set up local object
     Memory.Job.Build[id] = data;
 
-    const job = new JobBuild(id);
-
-    job.site = site;
-    job.pickUp = pickUp;
-
     // return the new object.
-    return job;
+    return new JobBuild(id);
   }
 
   public static remove(id: string): void
@@ -71,11 +78,8 @@ export class JobBuild extends JobHire
   //   INSTANCE FIELDS
   // =============================================================================
 
-  private pickUp: Structure | null;
-  private site: ConstructionSite | null;
-
-  private buildTaskData: BuildTaskData;
-  private withdrawTaskData: WithdrawTaskData;
+  private buildTaskData: BuildTaskMemory;
+  private withdrawTaskData: WithdrawTaskMemory;
 
   // =============================================================================
   //   CONSTRUCTOR
@@ -83,7 +87,12 @@ export class JobBuild extends JobHire
 
   constructor(id: string)
   {
-    super(id, type);
+    super(id, "Build");
+  }
+
+  public get(id: string): Job
+  {
+    return new JobBuild(id);
   }
 
   // =============================================================================
@@ -100,15 +109,15 @@ export class JobBuild extends JobHire
         {
           const result = creep.doTask();
 
-          if (result !== TaskResult.NOT_DONE)
+          if (result !== TaskResult.WORKING)
           {
             // get the work task or refill task based on whether
             // it's over or under half full
             const energy: number =
               (creep.carry.energy === undefined ? 0 : creep.carry.energy);
             const task = ((energy >= creep.carryCapacity / 2) ?
-              (this.getBuildTaskData()) :
-              (this.getWithdrawTaskData()));
+              (this.getBuildTaskMemory()) :
+              (this.getWithdrawTaskMemory()));
 
             // set the task and do it once this tick
             creep.setTask(task);
@@ -131,46 +140,6 @@ export class JobBuild extends JobHire
 
   // SITE / COMPLETENESS METHODS
 
-  public getSite(): ConstructionSite | null
-  {
-    if (this.site === undefined)
-    {
-      const data = this.rawData().site;
-
-      if (data === null)
-      {
-        this.site = null;
-      }
-      else
-      {
-        const identified = Visibility.identifyConstructionSite(data);
-        // there really shouldn't be an array of structures, but just in case...
-        if (identified instanceof Array)
-        {
-          this.site = identified[0];
-        }
-        else if (identified instanceof ConstructionSite)
-        {
-          this.site = identified;
-        }
-        else
-        {
-          if (identified === Visibility.ERROR.NOT_PRESENT ||
-            identified === Visibility.ERROR.NOT_VISIBLE)
-          {
-            this.site = null;
-          }
-          else
-          {
-            throw new Error("Unexpected identification error: " + identified);
-          }
-        }
-      }
-    }
-
-    return this.site;
-  }
-
   public getSiteIdentifier(): IdentifiableStructure | null
   {
     return this.rawData().site;
@@ -183,39 +152,6 @@ export class JobBuild extends JobHire
 
   // PICKUP METHODS
 
-  public getPickUp(): Structure | null
-  {
-    if (this.pickUp === undefined)
-    {
-      const data = this.getPickUpIdentifier();
-
-      const identified = Visibility.identifyStructure(data);
-      // there really shouldn't be an array of structures, but just in case...
-      if (identified instanceof Array)
-      {
-        this.pickUp = identified[0];
-      }
-      else if (identified instanceof Structure)
-      {
-        this.pickUp = identified;
-      }
-      else
-      {
-        if (identified === Visibility.ERROR.NOT_PRESENT ||
-          identified === Visibility.ERROR.NOT_VISIBLE)
-        {
-          this.pickUp = null;
-        }
-        else
-        {
-          throw new Error("Unexpected identification error: " + identified);
-        }
-      }
-    }
-
-    return this.pickUp;
-  }
-
   public getPickUpIdentifier(): IdentifiableStructure
   {
     return this.rawData().pickUp;
@@ -223,8 +159,6 @@ export class JobBuild extends JobHire
 
   public setPickUp(structure: Structure): void
   {
-    this.pickUp = structure;
-
     Memory.Job.Build[this._id].pickUp = structure.identifier();
   }
 
@@ -232,7 +166,7 @@ export class JobBuild extends JobHire
   //   PRIVATE METHODS
   // =============================================================================
 
-  private getBuildTaskData(): BuildTaskData
+  private getBuildTaskMemory(): BuildTaskMemory
   {
     if (this.buildTaskData === undefined)
     {
@@ -243,20 +177,18 @@ export class JobBuild extends JobHire
         throw new Error("Cannot retrieve build task data, no identifiable site defined");
       }
 
-      this.buildTaskData = {site: siteData};
+      this.buildTaskData = Task.Build.createMemory(siteData);
     }
 
     return this.buildTaskData;
   }
 
-  private getWithdrawTaskData(): WithdrawTaskData
+  private getWithdrawTaskMemory(): WithdrawTaskMemory
   {
     if (this.withdrawTaskData === undefined)
     {
-      this.withdrawTaskData = {
-        pickUp: this.getPickUpIdentifier(),
-        resourceType: RESOURCE_ENERGY
-      };
+      this.withdrawTaskData =
+        Task.Withdraw.createMemory(this.getPickUpIdentifier(), RESOURCE_ENERGY);
     }
 
     return this.withdrawTaskData;

@@ -1,74 +1,122 @@
-/*
- * Module code goes here. Use 'module.exports' to export things:
- * module.exports.thing = 'a thing';
- *
- * You can import it from another modules like this:
- * var mod = require('Task.repair');
- * mod.thing == 'a thing'; // true
- */
-
-MoveToPos = require('Task.moveToPos');
-
 // =============================================================================
-//  CONSTRUCTOR
+//   IMPORTS
 // =============================================================================
 
-function TaskRepair(structure)
+import {Task} from "./Task";
+import {TaskResult} from "./TaskResult";
+import * as Visibility from "../../Visibility";
+import {RoomPositionExt} from "../../prototypes/RoomPosition";
+import {TaskDefinition} from "./TaskDefinition";
+
+// =============================================================================
+//   INTERFACES
+// =============================================================================
+
+declare global
 {
-    this.structure = structure;
+  interface RepairTaskMemory extends TaskMemory
+  {
+    structure: IdentifiableStructure;
+  }
 }
 
 // =============================================================================
-//  MEMORY METHODS
+//   DEFINITION
 // =============================================================================
 
-TaskRepair.fromMemory = function(taskData)
+@TaskDefinition("Repair")
+export class Repair extends Task<RepairTaskMemory>
 {
-    let structure = Game.getObjectById(taskData.id);
-    
-    if (structure === undefined)
+  // =============================================================================
+  //   STATIC METHODS
+  // =============================================================================
+
+  public static createMemory(structure: IdentifiableStructure): RepairTaskMemory
+  {
+    if (!structure.isConstructed)
     {
-        return TaskMoveToPos.fromMemory(taskData, 3);
+      throw new Error("Identifier must be for a structure, not a construction site.");
     }
+
+    return {structure, type: "Repair"};
+  }
+
+  // =============================================================================
+  //   CONSTRUCTOR
+  // =============================================================================
+
+  constructor(memory: RepairTaskMemory)
+  {
+    super(memory);
+  }
+
+  // =============================================================================
+  //   PUBLIC METHODS
+  // =============================================================================
+
+  public execute(creep: Creep): TaskResult
+  {
+    let structure = Visibility.identifyStructure(this.memory.structure);
+
+    // there could be multiple things needing repairs here.
+    if (structure instanceof Array)
+    {
+      structure = structure[0];
+    }
+
+    // let's check if it actually found the structure
+    if (structure instanceof Structure)
+    {
+      // try to do thing to the thing
+      const result = creep.repair(structure);
+
+      // did thing well
+      if (result === OK)
+      {
+        const energy = creep.amountOf(RESOURCE_ENERGY);
+        const used = creep.getActiveBodyparts(WORK);
+
+        if (used > energy)
+        {
+          return TaskResult.DONE;
+        }
+        else
+        {
+          return TaskResult.WORKING;
+        }
+      }
+
+      // thing out of range
+      else if (result === ERR_NOT_IN_RANGE)
+      {
+        creep.moveTo(structure);
+        return TaskResult.WORKING;
+      }
+
+      // really bad error
+      else
+      {
+        throw new Error("Unexpected result from repairing " + structure +
+          " with " + creep + ": " + result);
+      }
+    }
+
+    // Apparently the location errored
     else
     {
-        return new TaskRepair(structure);
+      switch (structure)
+      {
+        case Visibility.ERROR.NOT_VISIBLE:
+          {
+            creep.moveTo(RoomPositionExt.deserialize(this.memory.structure.pos));
+            return TaskResult.WORKING;
+          }
+        default:
+          {
+            throw new Error(
+              "The structure data is REALLY BAD. ie. it's not a structure.");
+          }
+      }
     }
+  }
 }
-
-TaskRepair.prototype.toMemory = function()
-{
-    let data =
-    {
-        type: 'repair',
-        id: this.structure.id,
-        pos: this.structure.pos
-    };
-    
-    return data;
-}
-
-// =============================================================================
-//  INSTANCE METHODS
-// =============================================================================
-
-TaskRepair.prototype.execute = function(creep)
-{
-    let result = creep.repair(this.structure);
-    
-    if (result === ERR_NOT_IN_RANGE)
-    {
-        creep.moveTo(this.structure);
-    }
-    
-    if (creep.isEmptyOf(RESOURCE_ENERGY) || this.structure.hits === this.structure.hitsMax)
-    {
-        return taskResults.DONE;
-    }
-    else
-    {
-        return taskResults.NOT_DONE;
-    }
-}
-
-module.exports = TaskRepair;

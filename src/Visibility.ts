@@ -17,6 +17,36 @@
 import {RoomPositionExt} from "./prototypes/RoomPosition";
 
 // =============================================================================
+//   IDENTIFIABLE INTERFACES
+// =============================================================================
+
+declare global
+{
+  interface Identifiable
+  {
+    pos: string;
+    id?: string;
+  }
+
+  interface IdentifiableStructure extends Identifiable
+  {
+    structureType: string;
+    isConstructed: boolean;
+  }
+
+  interface IdentifiableCreep extends Identifiable
+  {
+    user: string;
+  }
+
+  interface IdentifiableResource extends Identifiable
+  {
+    resourceType: string;
+    isRenewable: boolean;
+  }
+}
+
+// =============================================================================
 //   EXPORTS
 // =============================================================================
 
@@ -54,7 +84,7 @@ export function identifyVagueResource(data: IdentifiableResource):
   {
     if (data.resourceType === RESOURCE_ENERGY)
     {
-      return identifyWithClass<Source>(data, Source);
+      return identifySource(data);
     }
     else
     {
@@ -152,7 +182,7 @@ export function identifyCreep(data: IdentifiableCreep):
 
 const identifyWithClass = function <Class extends RoomObject>(
   data: Identifiable,
-  constructor: {new(): Class},
+  constructor: {new(...args: any[]): Class},
   details?: (obj: Class) => boolean
 ): Class | Class[] | ERROR
 {
@@ -342,33 +372,3 @@ const identify = function(
   // we can't see the object or where it should be.
   return ERROR.NOT_VISIBLE;
 };
-
-// =============================================================================
-//   IDENTIFIABLE INTERFACES
-// =============================================================================
-
-declare global
-{
-  interface Identifiable
-  {
-    pos: string;
-    id?: string;
-  }
-
-  interface IdentifiableStructure extends Identifiable
-  {
-    structureType: string;
-    isConstructed: boolean;
-  }
-
-  interface IdentifiableCreep extends Identifiable
-  {
-    user: string;
-  }
-
-  interface IdentifiableResource extends Identifiable
-  {
-    resourceType: string;
-    isRenewable: boolean;
-  }
-}

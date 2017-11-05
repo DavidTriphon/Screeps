@@ -1,1 +1,8 @@
-export enum TaskResult {DONE, NOT_DONE, INCAPABLE, IMPOSSIBLE}
+export enum TaskResult
+{
+  DONE,
+  WORKING,
+  INCAPABLE,
+  IMPOSSIBLE,
+  UNCERTAIN
+}

@@ -2,32 +2,39 @@
 //   IMPORTS
 // =============================================================================
 
-import {JobHire} from "./JobHire";
+import {Job} from "./Job";
 import {RoomPositionExt} from "../../prototypes/RoomPosition";
 import * as Task from "../task/Module";
 import {TaskResult} from "../task/TaskResult";
+import {JobDefinition} from "./JobDefinition";
+
+// =============================================================================
+//   INTERFACES
+// =============================================================================
+
+declare global
+{
+  interface JobHaulMemory extends JobMemory
+  {
+    dropOff: IdentifiableStructure;
+    pickUp: IdentifiableStructure;
+    rate: number;
+    resourceType: string;
+    pPath?: string;
+    dPath?: string;
+  }
+}
 
 // =============================================================================
 //   CLASS DEFINITION
 // =============================================================================
 
-export class JobHaul extends JobHire
+@JobDefinition("Haul")
+export class JobHaul extends Job
 {
   // =============================================================================
   //   STATIC MEMORY METHODS
   // =============================================================================
-
-  // variables saved to memory include:
-  // - resource : RESOURCE_*
-  // - rate : number
-  // - path : [posData]
-  // - pickUp
-  //   - id : string
-  //   - pos : posData
-  // - dropOff
-  //   - id : string
-  //   - pos : posData
-  // - creepNames : [string]
 
   public static create(pickUpStructure: Structure, dropOffStructure: Structure,
     resourceType: string = RESOURCE_ENERGY, rate: number = Infinity)
@@ -47,13 +54,14 @@ export class JobHaul extends JobHire
       throw new Error("The rate must be a positive number:\n- rate: " +
         JSON.stringify(rate));
     }
-    // set the id by using the pickUp id.
+
+    // set the id by using the pickUp and dropOff id and resourceType.
     const id = pickUpStructure.id + dropOffStructure.id + resourceType;
 
     // make sure the directory exists.
-    if (Memory.JobHaul === undefined)
+    if (Memory.Job.Haul === undefined)
     {
-      Memory.JobHaul = {};
+      Memory.Job.Haul = {};
     }
 
     // make sure that the haul job doesn't already exist so you don't overwrite it
@@ -61,21 +69,15 @@ export class JobHaul extends JobHire
     {
       throw new Error("The hauler for this pickUp and dropOff is already defined.");
     }
-    // set up local object
-    Memory.JobHaul[id] = {};
 
-    // set the pick up and drop off memory
-    Memory.JobHaul[id].pickUp =
-      {id: pickUpStructure.id, pos: pickUpStructure.pos.serialize()};
-    Memory.JobHaul[id].dropOff =
-      {id: dropOffStructure.id, pos: dropOffStructure.pos.serialize()};
-
-    // set the max rate that the resource can flow, and the resource type
-    Memory.JobHaul[id].rate = rate;
-    Memory.JobHaul[id].resource = resourceType;
-
-    // set up creep employee array
-    Memory.JobHaul[id].creepNames = [];
+    // create object memory
+    Memory.Job.Haul[id] = {
+      pickUp: pickUpStructure.identifier(),
+      dropOff: dropOffStructure.identifier(),
+      rate,
+      resourceType,
+      creeps: []
+    };
 
     // return the new object.
     return new JobHaul(id);
@@ -83,12 +85,12 @@ export class JobHaul extends JobHire
 
   public static remove(id: string)
   {
-    delete Memory.JobHaul[id];
+    delete Memory.Job.Haul[id];
   }
 
   public static isJob(id: string)
   {
-    return (Memory.JobHaul[id] !== undefined);
+    return (Memory.Job.Haul[id] !== undefined);
   }
 
   // =============================================================================
@@ -97,7 +99,12 @@ export class JobHaul extends JobHire
 
   constructor(id: string)
   {
-    super(id, "JobHaul");
+    super(id, "Haul");
+  }
+
+  public get(id: string): Job
+  {
+    return new JobHaul(id);
   }
 
   // =============================================================================
@@ -111,9 +118,12 @@ export class JobHaul extends JobHire
 
     for (const creep of this.getCreeps())
     {
+      this.fire(creep);
       newJob.hire(creep);
     }
 
+    // gets rid of the old object memory and
+    // turns this one into the new one by changing the key
     JobHaul.remove(this._id);
 
     this._id = newJob._id;
@@ -127,55 +137,20 @@ export class JobHaul extends JobHire
   {
     for (const creep of this.getCreeps())
     {
-      // creep.say('I\'m a hauler!');
-
       const result = creep.doTask();
 
-      if (result !== TaskResult.NOT_DONE)
+      if (result !== TaskResult.WORKING)
       {
-        let task = null;
-        let resourceAmount = creep.carry[this.getResourceType()];
-        resourceAmount = (resourceAmount === undefined ? 0 : resourceAmount);
-
-        if (resourceAmount >= creep.carryCapacity / 2)
+        // set the task and do it once this tick
+        if (creep.emptySpace() <= creep.carryCapacity / 2)
         {
-          const dropOffData = this.getDropOffData();
-
-          const dropOff = Game.getObjectById(dropOffData.id);
-
-          if (dropOff !== undefined)
-          {
-            // if the structure is visible
-            // try to transfer to it
-            task = new Task.Transfer(dropOff, this.getResourceType());
-          }
-          else
-          {
-            // else give it a move task
-            task = new Task.MoveToPos(RoomPositionExt.deserialize(dropOffData.pos), 2);
-          }
+          creep.setTask(this.getTransferTaskMemory());
         }
         else
         {
-          const pickUpData = this.getPickUpData();
-
-          const pickUp = Game.getObjectById(pickUpData.id);
-
-          if (pickUp !== undefined)
-          {
-            // if the structure is visible
-            // try to transfer to it
-            task = new Task.Withdraw(pickUp, this.getResourceType());
-          }
-          else
-          {
-            // else give it a move task
-            task = new Task.MoveToPos(RoomPositionExt.deserialize(pickUpData.pos), 2);
-          }
+          creep.setTask(this.getWithdrawTaskMemory());
         }
 
-        // set the task and do it once this tick
-        creep.setTask(task);
         creep.doTask();
       }
     }
@@ -185,74 +160,193 @@ export class JobHaul extends JobHire
   //  PICKUP / DROPOFF METHODS
   // =============================================================================
 
+  // TASK METHODS
+
+  private getWithdrawTaskMemory(): WithdrawTaskMemory
+  {
+    return Task.Withdraw.createMemory(this.rawData().pickUp, this.rawData().resourceType);
+  }
+
+  private getTransferTaskMemory(): TransferTaskMemory
+  {
+    return Task.Transfer.createMemory(
+      this.rawData().dropOff, this.rawData().resourceType);
+  }
+
+  // ACCESSOR METHODS
+
   public getResourceType(): string
   {
-    return Memory.JobHaul[this._id].resource;
+    return this.rawData().resourceType;
   }
 
-  public getDropOffData()
+  public getDropOffData(): IdentifiableStructure
   {
-    return Memory.JobHaul[this._id].dropOff;
+    return this.rawData().dropOff;
   }
 
-  public getPickUpData()
+  public getPickUpData(): IdentifiableStructure
   {
-    return Memory.JobHaul[this._id].pickUp;
+    return this.rawData().pickUp;
   }
 
-  // TODO: Fix all these paths methods.
-  // I assume that I must've been working on optimizing pathing
-  // DO NOT USE THIS METHOD
+  // PATH METHODS
 
-  public getPathPositions()
+  public generatePaths(): number
   {
-    if (Memory.JobHaul[this._id].path === undefined)
-    {
-      const dropOffPosition = RoomPositionExt.deserialize(this.getDropOffData().pos);
-      const pickUpPosition = RoomPositionExt.deserialize(this.getPickUpData().pos);
+    const dropOffPosition = RoomPositionExt.deserialize(this.getDropOffData().pos);
+    const pickUpPosition = RoomPositionExt.deserialize(this.getPickUpData().pos);
 
-      // wtf is this all supposed to do?
-      // I got rid of the syntax errors but I'm prettu sure I developed useless behavior
+    // wtf is this all supposed to do?
+    // I got rid of the syntax errors but I'm pretty sure I developed useless behavior
 
-      const options: PathFinderOpts =
+    const options: PathFinderOpts = {
+      roomCallback: (roomName: string) =>
+      {
+        const costMatrix = new PathFinder.CostMatrix();
+
+        const room: Room | undefined = Game.rooms[roomName];
+
+        for (let x = 0; x < 50; x++)
         {
-          roomCallback: (roomName: string) =>
+          for (let y = 0; x < 50; y++)
           {
-            const costMatrix = new PathFinder.CostMatrix();
+            let isRoad = false;
 
-            for (let x = 0; x < 50; x++)
+            if (room)
             {
-              for (let y = 0; x < 50; y++)
+              const structures = room.lookForAt<Structure>(LOOK_STRUCTURES, x, y);
+
+              // searches structures for a structure that is a road
+              let index = 0;
+              while (isRoad === false && index < structures.length)
               {
-                const terrain = Game.map.getTerrainAt(x, y, roomName);
+                const structure = structures[index++];
 
-                const cost = (terrain === "swamp" ? 2 : (terrain === "wall" ? 0 : 1));
-
-                costMatrix.set(x, y, cost);
-                throw Error("NDY");
+                if (structure.structureType === STRUCTURE_ROAD)
+                {
+                  isRoad = true;
+                }
               }
             }
 
-            return costMatrix;
+            let cost;
+
+            if (isRoad)
+            {
+              cost = 1;
+            }
+            else
+            {
+              const terrain = Game.map.getTerrainAt(x, y, roomName);
+
+              cost = (terrain === "swamp" ? 10 : (terrain === "plain" ? 1 : 255));
+            }
+
+            costMatrix.set(x, y, cost);
           }
-        };
+        }
 
-      const path = PathFinder.search(pickUpPosition,
-        [{pos: dropOffPosition, range: 3}], options);
+        return costMatrix;
+      }
+    };
 
-      Memory.JobHaul[this._id].path = path;
+    const finderPathWrapper = PathFinder.search(pickUpPosition, dropOffPosition, options);
+
+    if (finderPathWrapper.incomplete)
+    {
+      // can't generate the path
+      return ERR_NO_PATH;
     }
 
-    return Memory.JobHaul[this._id].path;
+    // take off the first and last positions of the path.
+    const roomPosPath = finderPathWrapper.path;
+    roomPosPath.pop();
+    roomPosPath.shift();
+
+    const dPath: PathStep[] = [];
+    const pPath: PathStep[] = [];
+
+    let previousPos: RoomPosition | undefined;
+
+    for (const pos of roomPosPath)
+    {
+      if (previousPos)
+      {
+        // get difference in x and y between positions
+        const dx = pos.x - previousPos.x;
+        const dy = pos.y - previousPos.y;
+
+        // current position, going from last position
+        const pStep: PathStep = {
+          x: pos.x,
+          y: pos.y,
+          dx,
+          dy,
+          direction: this.getDirectionFromOffset(dx, dy)
+        };
+
+        // last position, going from current position
+        const dStep: PathStep = {
+          x: previousPos.x,
+          y: previousPos.y,
+          dx: -dx,
+          dy: -dy,
+          direction: this.getDirectionFromOffset(-dx, -dy)
+        };
+
+        // add steps to each array
+        pPath.push(pStep); // insert at end
+        dPath.unshift(dStep); // insert at front (going backwards)
+      }
+
+      previousPos = pos;
+    }
+
+    // serialize paths into memory
+    Memory.Job.Haul[this._id].dPath = Room.serializePath(dPath);
+    Memory.Job.Haul[this._id].pPath = Room.serializePath(pPath);
+
+    // everything went ok!
+    return OK;
   }
 
-  public getPathToDropOff(): PathStep[]
+  public getPathFromDropOff(): PathStep[] | undefined
   {
-    throw Error("NDY");
+    const path = this.rawData().dPath;
+
+    if (path)
+    {
+      return Room.deserializePath(path);
+    }
+
+    return undefined;
   }
 
-  public getPathToPickUp(): PathStep[]
+  public getPathFromPickUp(): PathStep[] | undefined
   {
-    throw Error("NDY");
+    const path = this.rawData().pPath;
+
+    if (path)
+    {
+      return Room.deserializePath(path);
+    }
+
+    return undefined;
+  }
+
+  private rawData(): JobHaulMemory
+  {
+    return Memory.Job.Haul[this._id];
+  }
+
+  private getDirectionFromOffset(dx: number, dy: number): number
+  {
+    const directions = [
+      [TOP_LEFT, TOP, TOP_RIGHT],
+      [LEFT, 0, RIGHT],
+      [BOTTOM_LEFT, BOTTOM, BOTTOM_RIGHT]];
+
+    return directions[1 + dy][1 + dx];
   }
 }

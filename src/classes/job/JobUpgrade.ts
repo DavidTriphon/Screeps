@@ -2,16 +2,31 @@
 //   IMPORTS
 // =============================================================================
 
-import {JobHire} from "./JobHire";
-import {RoomPositionExt} from "../../prototypes/RoomPosition";
+import {Job} from "./Job";
+import {JobDefinition} from "./JobDefinition";
+
 import * as Task from "../task/Module";
 import {TaskResult} from "../task/TaskResult";
+
+// =============================================================================
+//   INTERFACES
+// =============================================================================
+
+declare global
+{
+  interface JobUpgradeMemory extends JobMemory
+  {
+    controller: IdentifiableStructure;
+    pickUp: IdentifiableStructure;
+  }
+}
 
 // =============================================================================
 //   CLASS DEFINITION
 // =============================================================================
 
-export class JobUpgrade extends JobHire
+@JobDefinition("Upgrade")
+export class JobUpgrade extends Job
 {
   // =============================================================================
   //   MEMORY METHODS
@@ -22,7 +37,8 @@ export class JobUpgrade extends JobHire
   // - pickUp : Identifiable
   // - creepNames : []
 
-  public static create(controller: StructureController, pickUpStructure: Structure): JobUpgrade
+  public static create(controller: StructureController, pickUpStructure: Structure):
+    JobUpgrade
   {
     // make sure the main directory exists.
     if (Memory.Job.Upgrade === undefined)
@@ -39,9 +55,9 @@ export class JobUpgrade extends JobHire
       throw new Error("The upgrader for this room is already defined.");
     }
 
-    const data: JobUpgradeData = {
-      controller: {id: controller.id, pos: controller.pos.serialize()},
-      pickUp: {id: pickUpStructure.id, pos: pickUpStructure.pos.serialize()},
+    const data: JobUpgradeMemory = {
+      controller: controller.identifier(),
+      pickUp: pickUpStructure.identifier(),
       creeps: []
     };
 
@@ -66,8 +82,8 @@ export class JobUpgrade extends JobHire
   //   INSTANCE FIELDS
   // =============================================================================
 
-  private pickUpStructure: Structure | null;
-  private controller: StructureController | null;
+  private upgradeTaskMemory: UpgradeTaskMemory;
+  private withdrawTaskMemory: WithdrawTaskMemory | MoveToPosTaskMemory;
 
   // =============================================================================
   //   CONSTRUCTOR
@@ -75,7 +91,7 @@ export class JobUpgrade extends JobHire
 
   constructor(id: string)
   {
-    super(id, "JobUpgrade");
+    super(id, "Upgrade");
   }
 
   // =============================================================================
@@ -86,53 +102,19 @@ export class JobUpgrade extends JobHire
   {
     for (const creep of this.getCreeps())
     {
-      // creep.say('I\'m a upgrader!');
-
       const result = creep.doTask();
 
-      if (result !== TaskResult.NOT_DONE)
+      if (result !== TaskResult.WORKING)
       {
-        let task = null;
-
-        if (creep.carry.energy !== undefined && creep.carry.energy >= creep.carryCapacity / 2)
+        if (creep.amountOf(RESOURCE_ENERGY) >= creep.carryCapacity / 2)
         {
-          const controllerData = this.getControllerData();
-
-          const controller = Game.getObjectById(controllerData.id);
-
-          if (controller !== undefined)
-          {
-            // if the controller is visible
-            // try to upgrade to it
-            task = new Task.Upgrade(controller);
-          }
-          else
-          {
-            // else give it a move task
-            task = new Task.MoveToPos(RoomPositionExt.deserialize(controllerData.pos), 2);
-          }
+          creep.setTask(this.getUpgradeTaskMemory());
         }
         else
         {
-          const pickUpData = this.getPickUpData();
-
-          const pickUp = Game.getObjectById(pickUpData.id);
-
-          if (pickUp !== undefined)
-          {
-            // if the pickUp is visible
-            // try to withdraw from it
-            task = new Task.Withdraw(pickUp);
-          }
-          else
-          {
-            // else give it a move task
-            task = new Task.MoveToPos(RoomPositionExt.deserialize(pickUpData.pos), 2);
-          }
+          creep.setTask(this.getWithdrawTaskMemory());
         }
 
-        // set the task and do it once this tick
-        creep.setTask(task);
         creep.doTask();
       }
     }
@@ -142,84 +124,45 @@ export class JobUpgrade extends JobHire
   //   CONTROLLER METHODS
   // =============================================================================
 
-  public isControllerVisible(): boolean
+  // TASK METHODS
+
+  private getUpgradeTaskMemory(): UpgradeTaskMemory
   {
-    try
+    if (this.upgradeTaskMemory === undefined)
     {
-      this.getController();
-    }
-    catch
-    {
-      return false;
+      this.upgradeTaskMemory = Task.Upgrade.createMemory(this.getControllerData());
     }
 
-    return true;
+    return this.upgradeTaskMemory;
   }
 
-  public getController(): Controller
+  private getWithdrawTaskMemory(): WithdrawTaskMemory | MoveToPosTaskMemory
   {
-    if (this.controller === undefined)
+    if (this.withdrawTaskMemory === undefined)
     {
-      const data = this.getControllerData();
-
-      this.controller = Game.getObjectById<Controller>(data.id);
+      this.withdrawTaskMemory =
+        Task.Withdraw.createMemory(this.getPickUpData(), RESOURCE_ENERGY);
     }
 
-    if (this.controller === null)
-    {
-      throw new Error("The controller is not visible.");
-    }
-
-    return this.controller;
+    return this.withdrawTaskMemory;
   }
 
-  public getControllerData(): Identifiable
+  // CONTROLLER METHODS
+
+  public getControllerData(): IdentifiableStructure
   {
     return Memory.Job.Upgrade[this._id].controller;
   }
 
-  // =============================================================================
-  //   PICKUP METHODS
-  // =============================================================================
+  // PICKUP METHODS
 
-  public isPickUpVisible(): boolean
-  {
-    try
-    {
-      this.getPickUpStructure();
-    }
-    catch
-    {
-      return false;
-    }
-
-    return true;
-  }
-
-  public getPickUpStructure(): Structure
-  {
-    if (this.pickUpStructure === undefined)
-    {
-      const data = this.getPickUpData();
-
-      this.pickUpStructure = Game.getObjectById<Structure>(data.id);
-    }
-
-    if (this.pickUpStructure === null)
-    {
-      throw new Error("The controller is not visible.");
-    }
-
-    return this.pickUpStructure;
-  }
-
-  public getPickUpData(): Identifiable
+  public getPickUpData(): IdentifiableStructure
   {
     return Memory.Job.Upgrade[this._id].pickUp;
   }
 
   public setPickUpStructure(structure: Structure)
   {
-    Memory.Job.Upgrade[this._id].pickUp = {id: structure.id, pos: structure.pos.serialize()};
+    Memory.Job.Upgrade[this._id].pickUp = structure.identifier();
   }
 }

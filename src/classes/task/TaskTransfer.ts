@@ -2,8 +2,11 @@
 //   IMPORTS
 // =============================================================================
 
-import {Task} from "./AbstractTask";
+import {Task} from "./Task";
 import {TaskResult} from "./TaskResult";
+import * as Visibility from "../../Visibility";
+import {RoomPositionExt} from "../../prototypes/RoomPosition";
+import {TaskDefinition} from "./TaskDefinition";
 
 // =============================================================================
 //   INTERFACES
@@ -11,7 +14,7 @@ import {TaskResult} from "./TaskResult";
 
 declare global
 {
-  interface TransferTaskData
+  interface TransferTaskMemory extends TaskMemory
   {
     dropOff: IdentifiableStructure;
     resourceType: string;
@@ -22,36 +25,90 @@ declare global
 //   DEFINITION
 // =============================================================================
 
-export const TaskTransfer: Task<TransferTaskData> =
+@TaskDefinition("Transfer")
+export class Transfer extends Task<TransferTaskMemory>
+{
+  // =============================================================================
+  //   STATIC METHODS
+  // =============================================================================
+
+  public static createMemory(structure: IdentifiableStructure, resourceType: string):
+    TransferTaskMemory
   {
-    execute(creep: Creep, taskData: TransferTaskData): TaskResult
+    if (!structure.isConstructed)
     {
-      if (this.structure.energy !== undefined ?
-        (this.structure.energy === this.structure.energyCapacity) :
-        (this.structure.store[RESOURCE_ENERGY] === this.structure.storeCapacity)
-      )
+      throw new Error("Identifier must be for a structure, not a construction site.");
+    }
+
+    return {dropOff: structure, resourceType, type: "Build"};
+  }
+
+  // =============================================================================
+  //   CONSTRUCTOR
+  // =============================================================================
+
+  constructor(memory: TransferTaskMemory)
+  {
+    super(memory);
+  }
+
+  // =============================================================================
+  //   PUBLIC METHODS
+  // =============================================================================
+
+  public execute(creep: Creep): TaskResult
+  {
+    const structure = Visibility.identifyStructure(this.memory.dropOff);
+
+    // get the idea out of its head that there could be multiple structures
+    if (structure instanceof Array)
+    {
+      throw new Error("IMPOSSIBILITY: CHECK IMPLEMENTTAION:\n" +
+        "Visibility claims there is an array of structures at a single position.");
+    }
+
+    // let's check if it actually found the structure
+    if (structure instanceof Structure)
+    {
+      // try to transfer to the structure
+      const result = creep.transfer(structure, this.memory.resourceType);
+
+      // transferred successfully
+      if (result === OK)
       {
         return TaskResult.DONE;
       }
 
-      let result = creep.transfer(this.structure, this.resource);
-
-      if (result === ERR_NOT_IN_RANGE)
+      // structure out of range
+      else if (result === ERR_NOT_IN_RANGE)
       {
-        creep.moveTo(this.structure);
-      }
-      else if (result !== OK)
-      {
-        return TaskResult.INCAPABLE;
+        creep.moveTo(structure);
+        return TaskResult.WORKING;
       }
 
-      if (creep.isEmpty() || (result === OK))
-      {
-        return TaskResult.DONE;
-      }
+      // really bad error
       else
       {
-        return TaskResult.NOT_DONE;
+        throw new Error("Unexpected result from transferring to " + structure +
+          " with " + creep + ": " + result);
       }
     }
-  };
+
+    // Apparently the location errored
+    else
+    {
+      switch (structure)
+      {
+        case Visibility.ERROR.NOT_VISIBLE:
+          {
+            creep.moveTo(RoomPositionExt.deserialize(this.memory.dropOff.pos));
+            return TaskResult.WORKING;
+          }
+        default:
+          {
+            throw new Error("The site data is REALLY BAD. ie. it's not a site.");
+          }
+      }
+    }
+  }
+}

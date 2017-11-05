@@ -6,8 +6,12 @@
 
 // job types
 
-import {JobHire} from "./classes/job/JobHire";
 import * as Job from "./classes/job/Module";
+import * as JobDefiner from "./classes/job/JobDefinition";
+
+// task types
+
+import * as TaskDefiner from "./classes/task/TaskDefinition";
 
 // prototypes
 
@@ -25,14 +29,24 @@ Bootstrapper.extendPrototypes();
 
 declare global
 {
+  // we need this because we deleted @node/types
+  function require(module: string): any;
+
+  // this allows us to write and read anything from global.
   const global: {
     [k: string]: any;
+    IS_FRIENDLY: {[name: string]: boolean};
+    MY_USERNAME: string;
+    System: any;
+    ex: (x: any) => string;
+    JobCtor: {[type: string]: JobDefiner.JobConstructor};
+    TaskList: {[type: string]: TaskDefiner.TaskConstructor<any, any>};
   };
 }
 
 global.MY_USERNAME = "DavidTriphon";
 
-const IS_FRIENDLY: {[name: string]: boolean} = {
+global.IS_FRIENDLY = {
   Dfett: true,
   EngineerYo: true,
   Cz4r: true,
@@ -41,7 +55,11 @@ const IS_FRIENDLY: {[name: string]: boolean} = {
   c01: true
 };
 
-global.IS_FRIENDLY = IS_FRIENDLY;
+global.ex = (x: any) => JSON.stringify(x, null, 2); // courtesy of @warinternal Aug 2016
+
+global.JobCtor = JobDefiner.definitions;
+
+global.TaskList = TaskDefiner.taskList;
 
 // =============================================================================
 //   PRIVATE METHODS
@@ -83,7 +101,7 @@ function startup()
   console.log("finished resetting all memory structures.");
 }
 
-function showBuildings()
+global.System.showSiteTypes = function showSiteTypes()
 {
   for (const siteID in Game.constructionSites)
   {
@@ -105,7 +123,7 @@ function showBuildings()
         break;
     }
   }
-}
+};
 
 // =============================================================================
 //   MAIN LOOP
@@ -129,11 +147,12 @@ export const loop = function main(): void
   // look for hostile creeps in range of spawn in order to activate safe mode.
 
   const hostileCreeps: Creep[] = _.filter(room.find(FIND_HOSTILE_CREEPS),
-    (creep) => (!IS_FRIENDLY[creep.owner.username]));
+    (creep) => (!global.IS_FRIENDLY[creep.owner.username]));
   const nearbyCreeps: Creep[] = _.filter(hostileCreeps,
     (creep) => (creep.pos.squareDistanceTo(spawn.pos) <= 3));
 
-  if (nearbyCreeps.length > 0)
+  // check if any enemy creeps are near the spawn
+  if (nearbyCreeps.length > 0 && (room.controller as Controller).safeMode === undefined)
   {
     Game.notify("Safe mode has been activated because " + nearbyCreeps[0].owner.username +
       " got too close to your spawn.");
@@ -166,76 +185,8 @@ export const loop = function main(): void
     }
 
   }
-  // repair broken structures instead
-  else
-  {
-    const weakStructures =
-      _.filter(roomStructures, (structure) => (structure instanceof OwnedStructure
-        && structure.hits < 100000 && structure.hits !== structure.hitsMax));
-
-    for (const tower of towers)
-    {
-      if (weakStructures.length > 0)
-      {
-        tower.repair(tower.pos.findClosestByRange(weakStructures));
-      }
-    }
-  }
 
   // == job control ==
-
-  if (Object.keys(Memory.Job.Build).length === 0)
-  {
-    const constructionSites: ConstructionSite[] = room.find(FIND_CONSTRUCTION_SITES);
-
-    if (constructionSites.length !== 0)
-    {
-      const newSite = (room.storage as Storage).pos.findClosestByRange(constructionSites);
-
-      Job.Build.create(newSite, room.storage);
-    }
-  }
-
-  for (const id in Memory.Job.Build)
-  {
-    let job = new Job.Build(id);
-
-    try
-    {
-      if (job.isDone())
-      {
-        const creeps = job.getCreeps();
-
-        Job.Build.remove(id);
-
-        // find the closest site to the spawn
-        const newSite =
-          (room.storage as Storage).pos.findClosestByRange(
-            room.find<ConstructionSite>(FIND_CONSTRUCTION_SITES));
-
-        if (newSite !== undefined)
-        {
-          // set the new job
-          job = Job.Build.create(newSite, room.storage);
-
-          // rehire the creeps from the last job
-          for (const creep of creeps)
-          {
-            job.hireByName(creep.name);
-          }
-        }
-        else
-        {
-          // TODO: tell the creeps to suicide at the grave container?
-        }
-      }
-    }
-    catch (e)
-    {
-      console.log(
-        "There was a mishap while trying to reset a new construction job:\n" + e.stack);
-    }
-  }
 
   // == Job execution ==
 
@@ -243,8 +194,7 @@ export const loop = function main(): void
   {
     for (const id of Memory[jobType])
     {
-      // TODO: FIND A PROPER WAY TO DO THIS #hack
-      const job = new (Job as any)[jobType](id) as JobHire;
+      const job = new global.JobCtor[jobType](id);
       job.execute();
     }
   }
@@ -260,7 +210,7 @@ export const loop = function main(): void
     if (!spawning)
     {
       // get harvest job and creeps
-      const harvestJob: Job.Harvest = new Job.Harvest(id);
+      const harvestJob = new Job.Harvest(id);
       const harvestCreeps: Creep[] = harvestJob.getCreeps();
 
       const workParts = _.sum(harvestCreeps,

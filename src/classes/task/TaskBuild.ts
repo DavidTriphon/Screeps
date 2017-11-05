@@ -2,9 +2,11 @@
 //   IMPORTS
 // =============================================================================
 
-import {Task} from "./AbstractTask";
+import {Task} from "./Task";
 import {TaskResult} from "./TaskResult";
+import * as Visibility from "../../Visibility";
 import {RoomPositionExt} from "../../prototypes/RoomPosition";
+import {TaskDefinition} from "./TaskDefinition";
 
 // =============================================================================
 //   INTERFACES
@@ -12,7 +14,7 @@ import {RoomPositionExt} from "../../prototypes/RoomPosition";
 
 declare global
 {
-  interface BuildTaskData
+  interface BuildTaskMemory extends TaskMemory
   {
     site: IdentifiableStructure;
   }
@@ -22,53 +24,99 @@ declare global
 //   DEFINITION
 // =============================================================================
 
-export const TaskBuild: Task<BuildTaskData> = {
-  execute(creep: Creep, data: BuildTaskData): TaskResult
-  {
-    const energy = (creep.carry.energy === undefined ? 0 : creep.carry.energy);
+@TaskDefinition("Build")
+export class Build extends Task<BuildTaskMemory>
+{
+  // =============================================================================
+  //   STATIC METHODS
+  // =============================================================================
 
-    if (energy === 0)
+  public static createMemory(site: IdentifiableStructure): BuildTaskMemory
+  {
+    if (site.isConstructed === true)
     {
-      return TaskResult.INCAPABLE;
+      throw new Error("Identifier must be for a construction site, not a structure.");
     }
 
-    const site: ConstructionSite | null =
-      Game.getObjectById<ConstructionSite>(data.site.id);
+    return {site, type: "Build"};
+  }
 
-    if (site !== null)
+  // =============================================================================
+  //   CONSTRUCTOR
+  // =============================================================================
+
+  constructor(memory: BuildTaskMemory)
+  {
+    super(memory);
+  }
+
+  // =============================================================================
+  //   PUBLIC METHODS
+  // =============================================================================
+
+  public execute(creep: Creep): TaskResult
+  {
+    const site = Visibility.identifyConstructionSite(this.memory.site);
+
+    // get the idea out of its head that there could be multiple sites
+    if (site instanceof Array)
     {
-      // get the result from building the site
+      throw new Error("IMPOSSIBILITY: CHECK IMPLEMENTTAION:\n" +
+        "Visibility claims there is an array of sites at a single position.");
+    }
+
+    // let's check if it actually found the site
+    if (site instanceof ConstructionSite)
+    {
+      // try to work on the site
       const result = creep.build(site);
 
-      // move if not in range
-      if (result === ERR_NOT_IN_RANGE)
+      // built a little bit successfully
+      if (result === OK)
+      {
+        const energy = creep.amountOf(RESOURCE_ENERGY);
+        const used = creep.getActiveBodyparts(WORK) * BUILD_POWER;
+
+        if (used > energy)
+        {
+          return TaskResult.DONE;
+        }
+        else
+        {
+          return TaskResult.WORKING;
+        }
+      }
+
+      // site out of range
+      else if (result === ERR_NOT_IN_RANGE)
       {
         creep.moveTo(site);
-
-        return TaskResult.NOT_DONE;
+        return TaskResult.WORKING;
       }
 
-      const used = creep.getActiveBodyparts(WORK) * BUILD_POWER;
-      const willBeEmpty = ((energy - used) <= 0);
-
-      // stop if the creep is empty now
-      if (willBeEmpty)
+      // really bad error
+      else
       {
-        return TaskResult.INCAPABLE;
+        throw new Error("Unexpected result from constructing " + site +
+          " with " + creep + ": " + result);
       }
-
-      return TaskResult.NOT_DONE;
     }
 
-    const pos = RoomPositionExt.deserialize(data.site.pos);
-
-    if (Game.rooms[pos.roomName] !== undefined)
+    // Apparently the location errored
+    else
     {
-      return TaskResult.IMPOSSIBLE;
+      switch (site)
+      {
+        case Visibility.ERROR.NOT_VISIBLE:
+          {
+            creep.moveTo(RoomPositionExt.deserialize(this.memory.site.pos));
+            return TaskResult.WORKING;
+          }
+        default:
+          {
+            throw new Error("The site memory is REALLY BAD. ie. it's not a site.");
+          }
+      }
     }
-
-    creep.moveTo(pos);
-
-    return TaskResult.NOT_DONE;
   }
-};
+}

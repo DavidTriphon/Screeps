@@ -1,9 +1,11 @@
-import {JobHire} from "./JobHire";
+import {Job} from "./Job";
 import {RoomPositionExt} from "../../prototypes/RoomPosition";
 import * as Task from "../task/Module";
 import {TaskResult} from "../task/TaskResult";
+import {JobDefinition} from "./JobDefinition";
 
-export class JobMine extends JobHire
+@JobDefinition("Mine")
+export class JobMine extends Job
 {
   // =============================================================================
   //   STATIC VARIABLES
@@ -124,7 +126,7 @@ export class JobMine extends JobHire
 
         const result = creep.doTask();
 
-        if (result !== TaskResult.NOT_DONE)
+        if (result !== TaskResult.WORKING)
         {
           let task = null;
 
@@ -275,4 +277,4 @@ export class JobMine extends JobHire
     // return whether the drop off point is at the ideal position
     return Memory.JobMine[this._id].dropOff.isIdeal;
   }
-}
+};

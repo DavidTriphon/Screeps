@@ -2,8 +2,11 @@
 //   IMPORTS
 // =============================================================================
 
-import {Task} from "./AbstractTask";
+import {Task} from "./Task";
 import {TaskResult} from "./TaskResult";
+import * as Visibility from "../../Visibility";
+import {RoomPositionExt} from "../../prototypes/RoomPosition";
+import {TaskDefinition} from "./TaskDefinition";
 
 // =============================================================================
 //   INTERFACES
@@ -11,7 +14,7 @@ import {TaskResult} from "./TaskResult";
 
 declare global
 {
-  interface UpgradeTaskData
+  interface UpgradeTaskMemory extends TaskMemory
   {
     controller: IdentifiableStructure;
   }
@@ -21,78 +24,101 @@ declare global
 //   DEFINITION
 // =============================================================================
 
-export class TaskUpgrade
+@TaskDefinition("Upgrade")
+export class Upgrade extends Task<UpgradeTaskMemory>
 {
   // =============================================================================
-  //   STATIC METHODS
+  //   PUBLIC STATIC
   // =============================================================================
 
-  public static fromMemory(taskData: UpgradeTaskData)
+  public static createMemory(controller: IdentifiableStructure): UpgradeTaskMemory
   {
-    let room = Game.rooms[taskData.room];
+    if (!controller.isConstructed)
+    {
+      throw new Error("Identifier must be for a structure, not a construction site.");
+    }
 
-    if (room === undefined)
-    {
-      return TaskMoveToPos.fromMemory(taskData, 3);
-    }
-    else
-    {
-      return new TaskUpgrade(room.controller);
-    }
+    return {controller, type: "Upgrade"};
   }
 
   // =============================================================================
   //   CONSTRUCTOR
   // =============================================================================
 
-  constructor(controller: StructureController)
+  constructor(memory: UpgradeTaskMemory)
   {
-    this.controller = controller;
+    super(memory);
   }
 
   // =============================================================================
-  //   MEMORY METHODS
+  //   PUBLIC METHODS
   // =============================================================================
 
-
-
-  toMemory()
+  public execute(creep: Creep)
   {
-    let data =
+    const controller = Visibility.identifyStructure(this.memory.controller);
+
+    // get the idea out of its head that there could be multiple controllers
+    if (controller instanceof Array)
+    {
+      throw new Error("IMPOSSIBILITY: CHECK IMPLEMENTTAION:\n" +
+        "Visibility claims there is an array of controllers at a single position.");
+    }
+
+    // let's check if it actually found the controller
+    if (controller instanceof StructureController)
+    {
+      // try to upgrade the controller
+      const result = creep.upgradeController(controller);
+
+      // built a little bit successfully
+      if (result === OK)
       {
-        type: 'upgrade',
-        room: this.controller.room.name,
-        pos: this.controller.pos
-      };
+        const energy = creep.amountOf(RESOURCE_ENERGY);
+        const used = creep.getActiveBodyparts(WORK);
+        const isEmptyNext = used > energy;
 
-    return data;
-  }
+        if (isEmptyNext)
+        {
+          return TaskResult.DONE;
+        }
+        else
+        {
+          return TaskResult.WORKING;
+        }
+      }
 
-  // =============================================================================
-  //  INSTANCE METHODS
-  // =============================================================================
+      // controller out of range
+      else if (result === ERR_NOT_IN_RANGE)
+      {
+        creep.moveTo(controller);
+        return TaskResult.WORKING;
+      }
 
-  TaskUpgrade.prototype.execute = function(creep)
-  {
-    let result = creep.upgradeController(this.controller);
-
-    if (result === ERR_NOT_IN_RANGE)
-    {
-      creep.moveTo(this.controller);
+      // really bad error
+      else
+      {
+        throw new Error("Unexpected result from upgrading " + controller +
+          " with " + creep + ": " + result);
+      }
     }
 
-    let energy = creep.carry[RESOURCE_ENERGY];
-    let workParts = creep.getActiveBodyparts(WORK);
-    let nextEnergy = energy - workParts;
-    let isEmptyNext = (nextEnergy <= 0);
-
-    if (creep.isEmptyOf(RESOURCE_ENERGY) || ((result === OK) && (isEmptyNext)))
-    {
-      return taskResults.DONE;
-    }
+    // Apparently the location errored
     else
     {
-      return taskResults.NOT_DONE;
+      switch (controller)
+      {
+        case Visibility.ERROR.NOT_VISIBLE:
+          {
+            creep.moveTo(RoomPositionExt.deserialize(this.memory.controller.pos));
+            return TaskResult.WORKING;
+          }
+        default:
+          {
+            throw new Error(
+              "The coontroller data is REALLY BAD. ie. it's not a controller.");
+          }
+      }
     }
   }
 }

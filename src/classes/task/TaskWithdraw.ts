@@ -2,9 +2,11 @@
 //   IMPORTS
 // =============================================================================
 
-import {Task} from "./AbstractTask";
+import {Task} from "./Task";
 import {TaskResult} from "./TaskResult";
+import * as Visibility from "../../Visibility";
 import {RoomPositionExt} from "../../prototypes/RoomPosition";
+import {TaskDefinition} from "./TaskDefinition";
 
 // =============================================================================
 //   INTERFACES
@@ -12,7 +14,7 @@ import {RoomPositionExt} from "../../prototypes/RoomPosition";
 
 declare global
 {
-  interface WithdrawTaskData
+  interface WithdrawTaskMemory extends TaskMemory
   {
     pickUp: IdentifiableStructure;
     resourceType: string;
@@ -23,45 +25,90 @@ declare global
 //   DEFINITION
 // =============================================================================
 
-export const TaskWithdraw: Task<WithdrawTaskData> = {
-  execute(creep: Creep, taskData: WithdrawTaskData): TaskResult
+@TaskDefinition("Withdraw")
+export class Withdraw extends Task<WithdrawTaskMemory>
+{
+  // =============================================================================
+  //   STATIC METHODS
+  // =============================================================================
+
+  public static createMemory(structure: IdentifiableStructure, resourceType: string):
+    WithdrawTaskMemory
   {
-    if (this.structure === undefined)
+    if (!structure.isConstructed)
     {
-      return TaskResult.INCAPABLE;
+      throw new Error("Identifier must be for a structure, not a construction site.");
     }
 
-    if (this.resource === RESOURCE_ENERGY)
+    return {pickUp: structure, resourceType, type: "Withdraw"};
+  }
+
+  // =============================================================================
+  //   CONSTRUCTOR
+  // =============================================================================
+
+  constructor(memory: WithdrawTaskMemory)
+  {
+    super(memory);
+  }
+
+  // =============================================================================
+  //   PUBLIC METHODS
+  // =============================================================================
+
+  public execute(creep: Creep): TaskResult
+  {
+    const structure = Visibility.identifyStructure(this.memory.pickUp);
+
+    // get the idea out of its head that there could be multiple structures
+    if (structure instanceof Array)
     {
-      if ((this.structure.energy !== undefined && this.structure.energy === 0) ||
-        this.structure.store !== undefined && this.structure.store[this.resource] === 0)
+      throw new Error("IMPOSSIBILITY: CHECK IMPLEMENTTAION:\n" +
+        "Visibility claims there is an array of structures at a single position.");
+    }
+
+    // let's check if it actually found the structure
+    if (structure instanceof Structure)
+    {
+      // try to withdraw from the structure
+      const result = creep.withdraw(structure, this.memory.resourceType);
+
+      // withdrew successfully
+      if (result === OK)
       {
         return TaskResult.DONE;
       }
-    } else
-    {
-      if (this.structure.store !== undefined && this.structure.store[this.resource] === 0)
+
+      // structure out of range
+      else if (result === ERR_NOT_IN_RANGE)
       {
-        return TaskResult.DONE;
+        creep.moveTo(structure);
+        return TaskResult.WORKING;
+      }
+
+      // really bad error
+      else
+      {
+        throw new Error("Unexpected result from withdrawing from " + structure +
+          " with " + creep + ": " + result);
       }
     }
 
-    let result = creep.withdraw(this.structure, this.resource);
-
-    if (result === ERR_NOT_IN_RANGE)
+    // Apparently the location errored
+    else
     {
-      creep.moveTo(this.structure);
-    } else if (result !== OK)
-    {
-      return TaskResult.INCAPABLE;
-    }
-
-    if (creep.isFull() || (result === OK))
-    {
-      return TaskResult.DONE;
-    } else
-    {
-      return TaskResult.NOT_DONE;
+      switch (structure)
+      {
+        case Visibility.ERROR.NOT_VISIBLE:
+          {
+            creep.moveTo(RoomPositionExt.deserialize(this.memory.pickUp.pos));
+            return TaskResult.WORKING;
+          }
+        default:
+          {
+            throw new Error("The site data is REALLY BAD. ie. it's not a site.");
+          }
+      }
     }
   }
-};
+}

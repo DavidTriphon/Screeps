@@ -1,40 +1,33 @@
-declare global
-{
-  {
-    [k: string]: any;
-  };
-}
-
 // =============================================================================
 //   CONSTRUCTOR EXTENSION (FOR VISIBILITY MODULE) #HACK
 // =============================================================================
 
-interface StructureConstructor
+interface StructureConstructorz
 {
   new(): Structure;
 }
 
-interface ConstructionSiteConstructor
+interface ConstructionSiteConstructorz
 {
   new(): ConstructionSite;
 }
 
-interface CreepConstructor
+interface CreepConstructorz
 {
   new(): Creep;
 }
 
-interface MineralConstructor
+interface MineralConstructorz
 {
   new(): Mineral;
 }
 
-interface SourceConstructor
+interface SourceConstructorz
 {
   new(): Source;
 }
 
-interface ResourceConstructor
+interface ResourceConstructorz
 {
   new(): Resource;
 }

@@ -48,10 +48,21 @@
     "arrow-return-shorthand": {
       "severity": "warning"
     },
-    "only-arrow-functions": {
+    "only-arrow-functions": false,
+    "no-shadowed-variable": {
       "severity": "warning"
     },
-    "no-shadowed-variable": {
+    "member-ordering": false,
+    "no-conditional-assignment": {
+      "severity": "warning"
+    },
+    "radix": false,
+    "jsdoc-format": false,
+    "whitespace": false,
+    "no-empty-interface": {
+      "severity": "warning"
+    },
+    "no-empty": {
       "severity": "warning"
     }
   }

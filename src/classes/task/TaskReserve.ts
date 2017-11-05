@@ -1,77 +1,114 @@
-/*
- * Module code goes here. Use 'module.exports' to export things:
- * module.exports.thing = 'a thing';
- *
- * You can import it from another modules like this:
- * var mod = require('Task.reserve');
- * mod.thing == 'a thing'; // true
- */
-
-MoveToPos = require('Task.moveToPos');
-
 // =============================================================================
-//  CONSTRUCTOR
+//   IMPORTS
 // =============================================================================
 
-function TaskReserve(controller)
+import {Task} from "./Task";
+import {TaskResult} from "./TaskResult";
+import * as Visibility from "../../Visibility";
+import {RoomPositionExt} from "../../prototypes/RoomPosition";
+import {TaskDefinition} from "./TaskDefinition";
+
+// =============================================================================
+//   INTERFACES
+// =============================================================================
+
+declare global
 {
-    this.controller = controller;
+  interface ReserveTaskMemory extends TaskMemory
+  {
+    controller: IdentifiableStructure;
+  }
 }
 
 // =============================================================================
-//  MEMORY METHODS
+//   DEFINITION
 // =============================================================================
 
-TaskReserve.fromMemory = function(taskData)
+@TaskDefinition("Reserve")
+export class Reserve extends Task<ReserveTaskMemory>
 {
-    let controller = Game.getObjectById(taskData.id);
-    
-    if (controller === undefined)
+  // =============================================================================
+  //   STATIC METHODS
+  // =============================================================================
+
+  public static createMemory(controller: IdentifiableStructure): ReserveTaskMemory
+  {
+    if (!controller.isConstructed)
     {
-        return TaskMoveToPos.fromMemory(taskData, 1);
+      throw new Error("Identifier must be for a structure, not a construction site.");
     }
+
+    return {controller, type: "Reserve"};
+  }
+
+  // =============================================================================
+  //   CONSTRUCTOR
+  // =============================================================================
+
+  constructor(memory: ReserveTaskMemory)
+  {
+    super(memory);
+  }
+
+  // =============================================================================
+  //   PUBLIC METHODS
+  // =============================================================================
+
+  public execute(creep: Creep): TaskResult
+  {
+    const controller = Visibility.identifyStructure(this.memory.controller);
+
+    // get the idea out of its head that there could be multiple controllers
+    if (controller instanceof Array)
+    {
+      throw new Error("IMPOSSIBILITY: CHECK IMPLEMENTTAION:\n" +
+        "Visibility claims there is an array of structures at a single position.");
+    }
+
+    // let's check if it actually found the controller
+    if (controller instanceof StructureController)
+    {
+      // try to reserve the controller
+      const result = creep.reserveController(controller);
+
+      // reserved the controller
+      if (result === OK)
+      {
+        // WORKING, ALWAYS WORKING!
+        return TaskResult.WORKING;
+      }
+
+      // controller out of range
+      else if (result === ERR_NOT_IN_RANGE)
+      {
+        creep.moveTo(controller);
+        return TaskResult.WORKING;
+      }
+
+      // really bad error
+      else
+      {
+        throw new Error("Unexpected result from reserving " + controller +
+          " with " + creep + ": " + result);
+      }
+    }
+
+    // Apparently the location errored
     else
     {
-        return new TaskReserve(controller);
+      switch (controller)
+      {
+        case Visibility.ERROR.NOT_VISIBLE:
+          {
+            creep.moveTo(RoomPositionExt.deserialize(this.memory.controller.pos));
+            return TaskResult.WORKING;
+          }
+        default:
+          {
+            throw new Error(
+              "The controller data is REALLY BAD. ie. it's not a controller.");
+          }
+      }
     }
+  }
 }
-
-TaskReserve.prototype.toMemory = function()
-{
-    let data =
-    {
-        type: 'reserve',
-        id: this.controller.id,
-        pos: this.controller.pos
-    };
-    
-    return data;
-}
-
-// =============================================================================
-//  INSTANCE METHODS
-// =============================================================================
-
-TaskReserve.prototype.execute = function(creep)
-{
-    // try to reserve the controller
-    let result = creep.reserveController(this.controller);
-    
-    if (result === ERR_NOT_IN_RANGE)
-    {
-        creep.moveTo(this.controller);
-    }
-    
-    if (this.controller.reservation &&
-        this.controller.reservation.ticksToEnd === 5000 &&
-        this.controller.reservation.owner === MY_USERNAME)
-    {
-        return taskResults.DONE;
-    }
-    else
-    {
-        return taskResults.NOT_DONE;
-    }
-}
-
-module.exports = TaskReserve;

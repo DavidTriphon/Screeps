@@ -1,85 +1,112 @@
-/*
- * Module code goes here. Use 'module.exports' to export things:
- * module.exports.thing = 'a thing';
- *
- * You can import it from another modules like this:
- * var mod = require('Task.pickUp');
- * mod.thing == 'a thing'; // true
- */
-
-MoveToPos = require('Task.moveToPos');
-
 // =============================================================================
-//  CONSTRUCTOR
+//   IMPORTS
 // =============================================================================
 
-function TaskPickUp(resource)
+import {Task} from "./Task";
+import {TaskResult} from "./TaskResult";
+import * as Visibility from "../../Visibility";
+import {RoomPositionExt} from "../../prototypes/RoomPosition";
+import {TaskDefinition} from "./TaskDefinition";
+
+// =============================================================================
+//   INTERFACES
+// =============================================================================
+
+declare global
 {
-    this.resource = resource;
+  interface PickUpTaskMemory extends TaskMemory
+  {
+    resource: IdentifiableResource;
+  }
 }
 
 // =============================================================================
-//  MEMORY METHODS
+//   DEFINITION
 // =============================================================================
 
-TaskPickUp.fromMemory = function(taskData)
+@TaskDefinition("PickUp")
+export class PickUp extends Task<PickUpTaskMemory>
 {
-    let resource = Game.getObjectById(taskData.id);
-    
-    if (resource === undefined && Game.rooms[taskData.pos.roomName] === undefined)
+  // =============================================================================
+  //   STATIC METHODS
+  // =============================================================================
+
+  public static createMemory(resource: IdentifiableResource): PickUpTaskMemory
+  {
+    if (resource.isRenewable)
     {
-        return MoveToPos.fromMemory(taskData, 1);
+      throw new Error("Identifier must be for a resource, not a source or mineral.");
     }
+
+    return {resource, type: "PickUp"};
+  }
+
+  // =============================================================================
+  //   CONSTRUCTOR
+  // =============================================================================
+
+  constructor(memory: PickUpTaskMemory)
+  {
+    super(memory);
+  }
+
+  // =============================================================================
+  //   PUBLIC METHODS
+  // =============================================================================
+
+  public execute(creep: Creep): TaskResult
+  {
+    let resource = Visibility.identifyResource(this.memory.resource);
+
+    // multiple resources in the same position are actually really common,
+    // so grab any of them
+    if (resource instanceof Array)
+    {
+      resource = resource[0];
+    }
+
+    // let's check if it actually found the resource
+    if (resource instanceof Resource)
+    {
+      // try to pick up the resource
+      const result = creep.pickup(resource);
+
+      // picked up successfully
+      if (result === OK)
+      {
+        return TaskResult.DONE;
+      }
+
+      // resource out of range
+      else if (result === ERR_NOT_IN_RANGE)
+      {
+        creep.moveTo(resource);
+        return TaskResult.WORKING;
+      }
+
+      // really bad error
+      else
+      {
+        throw new Error("Unexpected result from picking up " + resource +
+          " with " + creep + ": " + result);
+      }
+    }
+
+    // Apparently the resource errored
     else
     {
-        return new TaskPickUp(resource);
+      switch (resource)
+      {
+        case Visibility.ERROR.NOT_VISIBLE:
+          {
+            creep.moveTo(RoomPositionExt.deserialize(this.memory.resource.pos));
+            return TaskResult.WORKING;
+          }
+        default:
+          {
+            throw new Error("The resource data is REALLY BAD. ie. it's not a resource.");
+          }
+      }
     }
+  }
 }
-
-TaskPickUp.prototype.toMemory = function()
-{
-    let data =
-    {
-        type: 'pickUp',
-        id: this.resource.id,
-        pos: this.resource.pos
-    };
-    
-    return data;
-}
-
-// =============================================================================
-//  INSTANCE METHODS
-// =============================================================================
-
-TaskPickUp.prototype.execute = function(creep)
-{
-    // the resource is gone or completely picked up.
-    if (this.resource === undefined || this.resource === null)
-    {
-        return taskResults.DONE;
-    }
-    
-    // get whether it successfully picked it up
-    let result = creep.pickup(this.resource);
-    
-    if (result === ERR_NOT_IN_RANGE)
-    {
-        creep.moveTo(this.resource);
-    }
-    else if (result !== OK)
-    {
-        return taskResults.INCAPABLE;
-    }
-    
-    if (creep.isFull() || (result === OK))
-    {
-        return taskResults.DONE;
-    }
-    else
-    {
-        return taskResults.NOT_DONE;
-    }
-}
-
-module.exports = TaskPickUp;

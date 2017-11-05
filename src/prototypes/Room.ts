@@ -60,24 +60,25 @@ export function getRoomCoord(roomName: string): Coordinate
   const isSouth = roomName.indexOf("S") !== -1;
   const isEast = roomName.indexOf("E") !== -1;
 
-  // separate the numbers from the string by removing the starting letter and splitting at the middle letter
+  // separate the numbers from the string by
+  // removing the starting letter and splitting at the middle letter
   const segments = roomName.substr(1).split((isSouth ? "S" : "N"));
 
-  // get x by finding the value of the first number and then seeing if it's opposite polarity
+  // get x by finding the value of the first number and
+  // then seeing if it's opposite polarity
   let x = Number(segments[0]);
   if (!isEast)
   {
     x = -x - 1;
   }
 
-  // get y by finding the value of the second number and then seeing if it's opposite polarity
+  // get y by finding the value of the second number and
+  // then seeing if it's opposite polarity
   let y = Number(segments[1]);
   if (!isSouth)
   {
     y = -y - 1;
   }
-
-  // console.log('please confirm: room ' + roomName + ' is at coordinate (' + x + ', ' + y + '). ?');
 
   // return position object
   return {x, y};

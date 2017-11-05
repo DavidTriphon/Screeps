@@ -2,29 +2,42 @@
 //   IMPORTS
 // =============================================================================
 
-import {JobHire} from "./JobHire";
-import {RoomPositionExt} from "../../prototypes/RoomPosition";
+import {Job} from "./Job";
+import {JobDefinition} from "./JobDefinition";
+
 import * as Task from "../task/Module";
 import {TaskResult} from "../task/TaskResult";
+
+import {RoomPositionExt} from "../../prototypes/RoomPosition";
+
+import * as Visibility from "../..//Visibility";
+
+// =============================================================================
+//   INTERFACES
+// =============================================================================
+
+declare global
+{
+  interface JobHarvestMemory extends JobMemory
+  {
+    source: IdentifiableResource;
+    dropOff: IdentifiableStructure;
+    contPos: string;
+    linkPos: string;
+    adjacentSpaces: number;
+  }
+}
 
 // =============================================================================
 //   CLASS DEFINITION
 // =============================================================================
 
-export class JobHarvest extends JobHire
+@JobDefinition("Harvest")
+export class JobHarvest extends Job
 {
   // =============================================================================
   //   MEMORY METHODS
   // =============================================================================
-
-  // variables saved to memory include:
-  // - source: IdentifiableResource
-  // - dropOff: IdentifiableStructure | IdentifiableConstructionSite
-  // - isBuilding: bool
-  // - idealContainerPos: string
-  // - idealLinkPos: string
-  // - adjacentSpaces: number
-  // - creepNames : []
 
   public static create(source: Source, dropOff: Structure | ConstructionSite): JobHarvest
   {
@@ -89,11 +102,11 @@ export class JobHarvest extends JobHire
     );
 
     // create the data structure for this new element in memory
-    const data: JobHarvestData = {
+    const data: JobHarvestMemory = {
       source: source.identifier(),
       dropOff: dropOff.identifier(),
-      idealContainerPos: idealContainerPosition.serialize(),
-      idealLinkPos: idealLinkPosition.serialize(),
+      contPos: idealContainerPosition.serialize(),
+      linkPos: idealLinkPosition.serialize(),
       adjacentSpaces: adjacentSpaces1.length,
       creeps: []
     };
@@ -118,13 +131,8 @@ export class JobHarvest extends JobHire
   //   INSTANCE FIELDS
   // =============================================================================
 
-  private isIdeal: boolean;
-
-  private dropOffStructure: Structure | ConstructionSite | IdentifiableStructure;
-  private source: Source | IdentifiableResource;
-
-  private dropOffData: TransferTaskData | BuildTaskData;
-  private harvestTaskData: HarvestTaskData;
+  private dropOffMemory: TransferTaskMemory | BuildTaskMemory | RepairTaskMemory;
+  private harvestTaskMemory: HarvestTaskMemory;
 
   // =============================================================================
   //   CONSTRUCTOR
@@ -132,7 +140,12 @@ export class JobHarvest extends JobHire
 
   constructor(id: string)
   {
-    super(id, "JobHarvest");
+    super(id, "Harvest");
+  }
+
+  public get(id: string): Job
+  {
+    return new JobHarvest(id);
   }
 
   // =============================================================================
@@ -145,138 +158,21 @@ export class JobHarvest extends JobHire
     {
       try
       {
-        // creep.say("I'm a harvester!");
-
         const result = creep.doTask();
 
-        if (result !== TaskResult.NOT_DONE)
+        if (result !== TaskResult.WORKING)
         {
-          let task = null;
-          const energy = (creep.carry.energy === undefined ? 0 : creep.carry.energy);
-
-          if (energy >= creep.carryCapacity / 2)
+          if (creep.amountOf(RESOURCE_ENERGY) >= creep.carryCapacity / 2)
           {
-            const dropOffData = this.getDropOffData();
-            const sitePos = RoomPositionExt.deserialize(dropOffData.pos);
-
-            if (dropOffData.id === undefined)
-            {
-              // the only case in which the id is not specified is when
-              //   the ideal container site has recently been created.
-              // search for it and assign it's id.
-
-              const room = Game.rooms[sitePos.roomName];
-
-              if (room !== undefined)
-              {
-                const sites =
-                  room.lookForAt<ConstructionSite>(LOOK_CONSTRUCTION_SITES, sitePos);
-
-                if (sites.length === 0)
-                {
-                  throw new Error(
-                    "There is no dropOff id specified and there is not " +
-                    "a construction site at the ideal location.");
-                }
-                // get the site at that position
-                const site = sites[0];
-                // assign it's id
-                this.rawData().dropOff.id = site.id;
-              }
-            }
-
-            // get the dropOff if the id is specified
-            let dropOff;
-
-            if (dropOffData.id !== undefined)
-            {
-              dropOff = Game.getObjectById(dropOffData.id);
-            }
-            // if the dropOff could not be specified, go towards the position
-
-            if (dropOff !== undefined && dropOff !== null)
-            {
-              // if the structure is visible
-
-              if (dropOffData.isBuilding)
-              {
-                // is being constructed
-
-                task = new Task.Build(dropOff);
-              }
-              else
-              {
-                // is already built
-
-                if (dropOff.hits < dropOff.hitsMax)
-                {
-                  // if the dump structure is damaged
-                  // try to repair it
-                  task = new Task.Repair(dropOff);
-                }
-                else
-                {
-                  // try to transfer to it
-                  task = new Task.Transfer(dropOff);
-                }
-              }
-            }
-            else
-            {
-              // the item is not visible
-
-              const room = Game.rooms[sitePos.roomName];
-
-              if (room === undefined)
-              {
-                // give it a move task
-                task = new Task.MoveToPos(sitePos, 2);
-              }
-              else
-              {
-                // it's in the same room and the item is not there,
-                // maybe it completed building it?
-                const structures =
-                  room.lookForAt<Structure>(LOOK_STRUCTURES, sitePos);
-                const container = _.find(structures,
-                  (struct) => struct.structureType ===
-                    STRUCTURE_CONTAINER) as StructureContainer;
-
-                if (container)
-                {
-                  this.setDropOffStructure(container);
-                }
-                else
-                {
-                  throw new Error("The structure for the id appears to be gone.");
-                }
-              }
-            }
+            creep.setTask(this.getDropOffTaskMemory());
           }
           else
           {
-            const sourceData = this.getSourceData();
-
-            const source = Game.getObjectById<Source>(sourceData.id);
-
-            if (source !== null)
-            {
-              // if the source is visible
-              // try to harvest it
-              task = new Task.Harvest(source);
-            }
-            else
-            {
-              // else give it a move task
-              task = new Task.MoveToPos(RoomPositionExt.deserialize(sourceData.pos), 2);
-            }
+            creep.setTask(this.getHarvestTaskMemory());
           }
 
-          // set the task and do it once this tick
-          creep.setTask(task);
           creep.doTask();
         }
-
       }
       catch (e)
       {
@@ -290,6 +186,109 @@ export class JobHarvest extends JobHire
   // =============================================================================
   //   INSTANCE METHODS
   // =============================================================================
+
+  // TASK METHODS
+
+  private getHarvestTaskMemory(): HarvestTaskMemory
+  {
+    if (this.harvestTaskMemory === undefined)
+    {
+      this.harvestTaskMemory = Task.Harvest.createMemory(this.rawData().source);
+    }
+    return this.harvestTaskMemory;
+  }
+
+  private getDropOffTaskMemory():
+    TransferTaskMemory | BuildTaskMemory | RepairTaskMemory | MoveToPosTaskMemory
+  {
+    if (this.dropOffMemory === undefined)
+    {
+      let task: TransferTaskMemory | BuildTaskMemory |
+        RepairTaskMemory | MoveToPosTaskMemory;
+      let dropOffData = this.getDropOffData();
+      let dropOff = Visibility.identifyVagueStructure(dropOffData);
+
+      if (dropOff instanceof Array)
+      {
+        let selected: ConstructionSite | Structure | undefined;
+
+        for (const site of dropOff)
+        {
+          if (site.structureType === STRUCTURE_CONTAINER ||
+            site.structureType === STRUCTURE_STORAGE ||
+            site.structureType === STRUCTURE_SPAWN ||
+            site.structureType === STRUCTURE_EXTENSION ||
+            site.structureType === STRUCTURE_LINK)
+          {
+            selected = site;
+          }
+        }
+
+        if (selected === undefined)
+        {
+          throw new Error(
+            "Non-transferrable structure is selected as the dropOff point.");
+        }
+
+        dropOff = selected;
+
+        // reassign memory to an object by id to prevent confusion in the future.
+        this.setDropOffStructure(dropOff);
+        dropOffData = this.getDropOffData();
+      }
+
+      // check if the dropOff is a structure
+      if (dropOff instanceof Structure)
+      {
+        if (dropOff.hits < dropOff.hitsMax)
+        {
+          task = Task.Repair.createMemory(dropOffData);
+        }
+        else
+        {
+          task = Task.Transfer.createMemory(dropOffData, RESOURCE_ENERGY);
+        }
+      }
+
+      // check if the dropOff is a construction site
+      else if (dropOff instanceof ConstructionSite)
+      {
+        task = Task.Build.createMemory(dropOffData);
+      }
+
+      // Visibility error
+      else
+      {
+        switch (dropOff)
+        {
+          // we just can't see it, move towards it until we can see it
+          case Visibility.ERROR.NOT_VISIBLE:
+            {
+              task = Task.MoveToPos.createMemory(dropOffData.pos, 3);
+            }
+          // maybe it was a construction site and now it's done.
+          case Visibility.ERROR.MISMATCH_TYPE:
+          case Visibility.ERROR.NOT_PRESENT:
+            {
+              if (dropOffData.isConstructed === false)
+              {
+                Memory.Job.Harvest[this._id].dropOff.isConstructed = true;
+              }
+            }
+          // there was a pretty severr error
+          default:
+            {
+              throw new Error(
+                "Severe Visibility error while generating dropOff task: " + dropOff);
+            }
+        }
+      }
+
+      this.dropOffMemory = task;
+    }
+
+    return this.dropOffMemory;
+  }
 
   // EMPLOYEE METHODS
 
@@ -307,9 +306,14 @@ export class JobHarvest extends JobHire
 
   // DROPOFF METHODS
 
-  public getIdealDropPosition(): RoomPosition
+  public getIdealContainerPos(): RoomPosition
   {
-    return RoomPositionExt.deserialize(this.rawData().idealPos);
+    return RoomPositionExt.deserialize(this.rawData().contPos);
+  }
+
+  public getIdealLinkPos(): RoomPosition
+  {
+    return RoomPositionExt.deserialize(this.rawData().linkPos);
   }
 
   public getDropOffData()
@@ -317,40 +321,29 @@ export class JobHarvest extends JobHire
     return this.rawData().dropOff;
   }
 
-  public setDropOffStructure(structure: Structure): void
+  public setDropOffStructure(structure: Structure | ConstructionSite): void
   {
-    this.rawData().dropOff = {
-      id: structure.id,
-      pos: structure.pos.serialize(),
-      type: structure.structureType
-    };
+    this.rawData().dropOff = structure.identifier();
   }
 
-  public isDropOffIdeal(): boolean
+  // IDEAL DROPOFF METHODS
+
+  public isContainerIdeal(): boolean
   {
-    // set the ideal variable if it hasn't been calculated yet
-    // (we don't want to have to repeatedly calculate it)
-    if (this.rawData().dropOff.isIdeal === undefined)
-    {
-      // get position data
-      const idealPos = this.rawData().idealPos;
-      const dropOffPos = this.rawData().dropOff.pos;
-
-      // set isIdeal to if the container position is the same as the dropOff position
-      this.rawData().dropOff.isIdeal = (
-        (idealPos === dropOffPos) &&
-        (this.rawData().dropOff.type === STRUCTURE_CONTAINER)
-      );
-    }
-
-    // return whether the drop off point is at the ideal position
-    return this.rawData().dropOff.isIdeal;
+    // return whether the drop off point is at the ideal container position
+    return this.rawData().dropOff.pos === this.rawData().contPos;
   }
 
-  public setIdealDropOff(): void
+  public isLinkIdeal(): boolean
+  {
+    // return whether the drop off point is at the ideal link position
+    return this.rawData().dropOff.pos === this.rawData().linkPos;
+  }
+
+  public setIdealContainer(): void
   {
     // get the ideal container position and room
-    const idealPos = RoomPositionExt.deserialize(this.rawData().idealPos);
+    const idealPos = RoomPositionExt.deserialize(this.rawData().contPos);
     const room = Game.rooms[idealPos.roomName];
 
     // make sure the room is visible before proceeding.
@@ -359,6 +352,7 @@ export class JobHarvest extends JobHire
       throw new Error(
         "The ideal container cannot be created because the room is not visible.");
     }
+
     // get the result from creating the construction site.
     const result = room.createConstructionSite(idealPos, STRUCTURE_CONTAINER);
 
@@ -387,12 +381,7 @@ export class JobHarvest extends JobHire
               site.structureType === STRUCTURE_CONTAINER)
             {
               // a road is fine, just keep working on that, and then build the container
-              this.rawData().dropOff = {
-                id: site.id,
-                pos: site.pos.serialize(),
-                structureType: site.structureType,
-                isBuilding: true
-              };
+              this.rawData().dropOff = site.identifier();
             }
             else
             {
@@ -419,11 +408,7 @@ export class JobHarvest extends JobHire
             {
               // there is a container here!
               // we've already built it (or someone else did ;) )
-              this.rawData().dropOff = {
-                id: container.id,
-                pos: this.rawData().idealPos,
-                type: STRUCTURE_CONTAINER
-              };
+              this.rawData().dropOff = container.identifier();
             }
             else
             {
@@ -456,8 +441,9 @@ export class JobHarvest extends JobHire
       case OK:
         // set the drop off point without the id specified, we can check that next tick.
         this.rawData().dropOff = {
-          pos: this.rawData().idealPos,
-          structureType: STRUCTURE_CONTAINER
+          pos: this.rawData().contPos,
+          structureType: STRUCTURE_CONTAINER,
+          isConstructed: false
         };
     }
   }
@@ -466,7 +452,7 @@ export class JobHarvest extends JobHire
   //   PRIVATE METHODS
   // =============================================================================
 
-  private rawData(): JobHarvestData
+  private rawData(): JobHarvestMemory
   {
     return Memory.Job.Harvest[this._id];
   }

@@ -1,61 +1,72 @@
+// =============================================================================
+//   IMPORTS
+// =============================================================================
 
-export class TaskMoveToPos extends AbstractTask
+import {Task} from "./Task";
+import {TaskResult} from "./TaskResult";
+import {RoomPositionExt} from "../../prototypes/RoomPosition";
+import {TaskDefinition} from "./TaskDefinition";
+
+// =============================================================================
+//   INTERFACES
+// =============================================================================
+
+declare global
+{
+  interface MoveToPosTaskMemory extends TaskMemory
+  {
+    pos: string;
+    range: number;
+  }
+}
+
+// =============================================================================
+//   DEFINITION
+// =============================================================================
+
+@TaskDefinition("MoveToPos")
+export class MoveToPos extends Task<MoveToPosTaskMemory>
 {
   // =============================================================================
-  //  MEMORY METHODS
+  //   STATIC METHODS
   // =============================================================================
 
-  public static fromMemory(taskData)
+  public static createMemory(pos: string, range: number): MoveToPosTaskMemory
   {
-    const pos = new RoomPosition(taskData.pos.x, taskData.pos.y, taskData.pos.roomName);
+    if (!(RoomPositionExt.deserialize(pos) instanceof RoomPosition))
+    {
+      throw new Error("Position string must be valid serialized position.");
+    }
 
-    return new TaskMoveToPos(pos, taskData.range);
+    return {pos, range, type: "MoveToPos"};
   }
 
   // =============================================================================
-  //   INSTANCE FIELDS
+  //   CONSTRUCTOR
   // =============================================================================
 
-  private pos: RoomPosition;
-  private range: number;
-
-  // =============================================================================
-  //  CONSTRUCTOR
-  // =============================================================================
-
-  constructor(pos: RoomPosition, range: number)
+  constructor(memory: MoveToPosTaskMemory)
   {
-    super();
-    this.pos = pos;
-    this.range = range;
+    super(memory);
   }
 
   // =============================================================================
-  //   INSTANCE METHODS
+  //   PUBLIC METHODS
   // =============================================================================
 
-  public toMemory()
+  public execute(creep: Creep): TaskResult
   {
-    const data =
-      {
-        type: "moveToPos",
-        pos: this.pos,
-        range: this.range
-      };
+    // get the position
+    const pos = RoomPositionExt.deserialize(this.memory.pos);
 
-    return data;
-  }
-
-  public execute(creep: Creep)
-  {
-    const distance = this.pos.squareDistanceTo(creep.pos);
-
-    if (distance <= this.range)
+    if (pos.squareDistanceTo(creep.pos) <= this.memory.range)
     {
       return TaskResult.DONE;
     }
-    creep.moveTo(this.pos);
-
-    return TaskResult.NOT_DONE;
+    else
+    {
+      creep.moveTo(pos);
+      return TaskResult.WORKING;
+    }
   }
 }

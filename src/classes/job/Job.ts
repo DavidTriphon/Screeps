@@ -94,14 +94,7 @@ export abstract class Job
 
   public hireByName(name: string): void
   {
-    const creep: Creep = Game.creeps[name];
-
-    if (creep === undefined)
-    {
-      throw new Error("There is no creep with the name \"" + name + "\".");
-    }
-
-    this.hire(creep);
+    Memory.Job[this._jobType][this._id].creeps.push(name);
   }
 
   public hire(creep: Creep): void

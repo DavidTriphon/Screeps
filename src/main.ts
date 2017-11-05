@@ -234,114 +234,6 @@ export const loop = function main(): void
     }
   }
 
-  // remote harvest hauler
-
-  if (!spawning)
-  {
-    const job = new Job.Haul("58abb6a15ace7d31c90b9bb9589d77f854fd9fb92ae9ef93");
-
-    if (job.getCreeps().length === 0)
-    {
-      const name = spawn.createCreep(
-        [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY,
-          MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE]);
-
-      // prevent anything else from spawning
-      spawning = true;
-
-      if (name instanceof String)
-      {
-        console.log("spawning " + name + " to haul to from remote harvest");
-        job.hireByName(name);
-      }
-    }
-  }
-
-  // west tower
-
-  if (!spawning)
-  {
-    const job = new Job.Haul("5897caf755a4abc81f0dbe3c589d2aef1da6a7420c875df9");
-
-    if (job.getCreeps().length === 0)
-    {
-      const name = spawn.createCreep([CARRY, CARRY, MOVE, MOVE]);
-
-      // prevent anything else from spawning
-      spawning = true;
-
-      if (name instanceof String)
-      {
-        console.log("spawning " + name + " to haul to west tower");
-        job.hireByName(name);
-      }
-    }
-  }
-
-  // east tower
-
-  if (!spawning)
-  {
-    const job = new Job.Haul("589d77f854fd9fb92ae9ef93589ebc49fe3995e23c6dc83d");
-
-    if (job.getCreeps().length === 0)
-    {
-      const name = spawn.createCreep([CARRY, CARRY, MOVE, MOVE]);
-
-      // prevent anything else from spawning
-      spawning = true;
-
-      if (name instanceof String)
-      {
-        console.log("spawning " + name + " to haul to east tower");
-        job.hireByName(name);
-      }
-    }
-  }
-
-  // keanium trade hauler
-
-  if (!spawning)
-  {
-    const job = new Job.Haul("589d77f854fd9fb92ae9ef9358a69697a707156f3ccbf7bb");
-
-    if (job.getCreeps().length === 0)
-    {
-      const name = spawn.createCreep([CARRY, CARRY, CARRY, MOVE]);
-
-      // prevent anything else from spawning
-      spawning = true;
-
-      if (name instanceof String)
-      {
-        console.log("spawning " + name + " to haul keanium to trader");
-        job.hireByName(name);
-      }
-    }
-  }
-
-  // upgrader hauler
-
-  if (!spawning)
-  {
-    const job = new Job.Haul("589d77f854fd9fb92ae9ef93589ec3759c4e3b5b2d089af5");
-
-    if (job.getCreeps().length === 0)
-    {
-      const name = spawn.createCreep(
-        [CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE]);
-
-      // prevent anything else from spawning
-      spawning = true;
-
-      if (name instanceof String)
-      {
-        console.log("spawning " + name + " to haul to upgrader bucket");
-        job.hireByName(name);
-      }
-    }
-  }
-
   // upgraders
 
   for (const id in Memory.Job.Upgrade)
@@ -352,7 +244,7 @@ export const loop = function main(): void
 
       if (spawn.energy === spawn.energyCapacity && job.getCreeps().length < 4)
       {
-        const name = spawn.createCreep([WORK, WORK, WORK, CARRY, MOVE, MOVE, MOVE]);
+        const name = spawn.createCreep([WORK, CARRY, MOVE, MOVE]);
 
         // prevent anything else from spawning
         spawning = true;
@@ -360,36 +252,6 @@ export const loop = function main(): void
         if (name instanceof String)
         {
           console.log("spawning " + name + " to upgrade");
-          job.hireByName(name);
-        }
-      }
-    }
-  }
-
-  // builders
-
-  for (const id in Memory.Job.Build)
-  {
-    if (!spawning)
-    {
-      const job = new Job.Build(id);
-      let energy = (room.storage as Storage).store[RESOURCE_ENERGY];
-      energy = (energy === undefined ? 0 : energy);
-
-      if (job.getCreeps().length < Math.floor(
-        energy / (2 * 5 /*parts*/ * CREEP_LIFE_TIME * BUILD_POWER)))
-      {
-        const name = spawn.createCreep(
-          [WORK, WORK, WORK, WORK, WORK,
-            CARRY, CARRY, CARRY,
-            MOVE, MOVE, MOVE, MOVE, MOVE]);
-
-        // prevent anything else from spawning
-        spawning = true;
-
-        if (name instanceof String)
-        {
-          console.log("spawning " + name + " to build");
           job.hireByName(name);
         }
       }

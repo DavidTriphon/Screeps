@@ -74,7 +74,7 @@ export class Withdraw extends Task<WithdrawTaskMemory>
       const result = creep.withdraw(structure, this.memory.resourceType);
 
       // withdrew successfully
-      if (result === OK)
+      if (result === OK || result === ERR_FULL)
       {
         return TaskResult.DONE;
       }

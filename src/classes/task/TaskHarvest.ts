@@ -82,7 +82,7 @@ export class Harvest extends Task<HarvestTaskMemory>
         const emptySpace = creep.emptySpace();
         const mined = creep.getActiveBodyparts(WORK) * HARVEST_POWER;
 
-        if (mined > emptySpace)
+        if (mined >= emptySpace)
         {
           return TaskResult.DONE;
         }
@@ -119,7 +119,8 @@ export class Harvest extends Task<HarvestTaskMemory>
           }
         default:
           {
-            throw new Error("The source data is REALLY BAD. ie. it's not a source.");
+            throw new Error(
+              "The source data is REALLY BAD. ie. it's not a source.\nError: " + source);
           }
       }
     }

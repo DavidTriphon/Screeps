@@ -76,7 +76,7 @@ export class Upgrade extends Task<UpgradeTaskMemory>
       {
         const energy = creep.amountOf(RESOURCE_ENERGY);
         const used = creep.getActiveBodyparts(WORK);
-        const isEmptyNext = used > energy;
+        const isEmptyNext = used >= energy;
 
         if (isEmptyNext)
         {
@@ -86,6 +86,12 @@ export class Upgrade extends Task<UpgradeTaskMemory>
         {
           return TaskResult.WORKING;
         }
+      }
+
+      // already empty and we missed it
+      else if (result === ERR_NOT_ENOUGH_RESOURCES)
+      {
+        return TaskResult.DONE;
       }
 
       // controller out of range

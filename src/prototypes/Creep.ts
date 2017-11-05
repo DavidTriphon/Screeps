@@ -56,19 +56,20 @@ export class CreepExt extends Creep
     this.memory.task = taskData;
   }
 
-  public getTaskType(): string
-  {
-    return this.getTask().type;
-  }
-
-  public getTask(): TaskMemory
+  public getTask(): TaskMemory | undefined
   {
     return this.memory.task as TaskMemory;
   }
 
   public doTask(): TaskResult
   {
-    return new global.TaskList[this.getTaskType()](this.getTask()).execute(this);
+    const taskData = this.getTask();
+
+    if (taskData)
+    {
+      return new global.TaskList[taskData.type](taskData).execute(this);
+    }
+    return TaskResult.IMPOSSIBLE;
   }
 
   // =============================================================================

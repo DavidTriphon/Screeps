@@ -102,20 +102,29 @@ export class JobUpgrade extends Job
   {
     for (const creep of this.getCreeps())
     {
-      const result = creep.doTask();
-
-      if (result !== TaskResult.WORKING)
+      try
       {
-        if (creep.amountOf(RESOURCE_ENERGY) >= creep.carryCapacity / 2)
-        {
-          creep.setTask(this.getUpgradeTaskMemory());
-        }
-        else
-        {
-          creep.setTask(this.getWithdrawTaskMemory());
-        }
+        const result = creep.doTask();
 
-        creep.doTask();
+        if (result !== TaskResult.WORKING)
+        {
+          if (creep.amountOf(RESOURCE_ENERGY) >= creep.carryCapacity / 2)
+          {
+            creep.setTask(this.getUpgradeTaskMemory());
+          }
+          else
+          {
+            creep.setTask(this.getWithdrawTaskMemory());
+          }
+
+          creep.doTask();
+        }
+      }
+      catch (e)
+      {
+        console.log("The creep " + creep.name +
+          " had an issue when trying to execute for the job " +
+          this._jobType + ".\n" + e.stack);
       }
     }
   }

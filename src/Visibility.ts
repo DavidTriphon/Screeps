@@ -276,7 +276,7 @@ const identify = function(
   if (obj !== null)
   {
     // check it's position
-    if (obj.pos === pos)
+    if (obj.pos.equals(pos))
     {
       // this is what we we're looking for
       return obj;

@@ -40,7 +40,7 @@ export class Transfer extends Task<TransferTaskMemory>
       throw new Error("Identifier must be for a structure, not a construction site.");
     }
 
-    return {dropOff: structure, resourceType, type: "Build"};
+    return {dropOff: structure, resourceType, type: "Transfer"};
   }
 
   // =============================================================================
@@ -74,7 +74,7 @@ export class Transfer extends Task<TransferTaskMemory>
       const result = creep.transfer(structure, this.memory.resourceType);
 
       // transferred successfully
-      if (result === OK)
+      if (result === OK || result === ERR_NOT_ENOUGH_ENERGY)
       {
         return TaskResult.DONE;
       }

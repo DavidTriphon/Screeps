@@ -44,6 +44,8 @@ declare global
   }
 }
 
+global.System = {};
+
 global.MY_USERNAME = "DavidTriphon";
 
 global.IS_FRIENDLY = {
@@ -75,10 +77,12 @@ function startup()
     Memory[key] = {};
   }
 
-  for (const jobType in Job)
-  {
-    Memory.Job[jobType] = {};
-  }
+  Memory.Job = {
+    Build: {},
+    Harvest: {},
+    Haul: {},
+    Upgrade: {}
+  };
 
   // create a harvesting job and an upgrading job for every room we have a spawn in.
 
@@ -192,7 +196,7 @@ export const loop = function main(): void
 
   for (const jobType in Job)
   {
-    for (const id of Memory[jobType])
+    for (const id in Memory.Job[jobType])
     {
       const job = new global.JobList[jobType](id);
       job.execute();
@@ -217,15 +221,15 @@ export const loop = function main(): void
         (creep: Creep) => (_.countBy(creep.body, (part) => (part.type))[WORK]));
       // console.log("workParts: " + workParts);
 
-      if (workParts < 6)
+      if (workParts < 6 && harvestCreeps.length < harvestJob.maxCreeps())
       {
         const name = spawn.createCreep(
-          [WORK, WORK, WORK, WORK, WORK, WORK, CARRY, MOVE, MOVE, MOVE]);
+          [WORK, CARRY, MOVE, MOVE]);
 
         // prevent anything else from spawning
         spawning = true;
 
-        if (!(name instanceof Number))
+        if (typeof name === "string")
         {
           console.log("spawning " + name + " to harvest");
           harvestJob.hireByName(name);
@@ -242,14 +246,14 @@ export const loop = function main(): void
     {
       const job = new Job.Upgrade(id);
 
-      if (spawn.energy === spawn.energyCapacity && job.getCreeps().length < 4)
+      if (spawn.energy === spawn.energyCapacity)
       {
         const name = spawn.createCreep([WORK, CARRY, MOVE, MOVE]);
 
         // prevent anything else from spawning
         spawning = true;
 
-        if (name instanceof String)
+        if (typeof name === "string")
         {
           console.log("spawning " + name + " to upgrade");
           job.hireByName(name);
